@@ -1,10 +1,11 @@
+runs/
+
 .coverage
 coverage.xml
 .dmypy.json
 .gradle
 .hypothesis
 .mypy_cache
-/.extracted_scripts/
 **/.pytorch_specified_test_cases.csv
 **/.pytorch-disabled-tests.json
 **/.pytorch-slow-tests.json
