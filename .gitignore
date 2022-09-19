@@ -1,4 +1,5 @@
 runs/
+data/
 
 .coverage
 coverage.xml
