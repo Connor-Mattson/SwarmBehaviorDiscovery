@@ -15,13 +15,6 @@ from generation.HaltedEvolution import HaltedEvolution
 def main():
     agent_config = ConfigurationDefaults.DIFF_DRIVE_AGENT
 
-    genotype = [
-        GeneRule(_max=1.0, _min=-1.0, mutation_step=0.4, round_digits=4),
-        GeneRule(_max=1.0, _min=-1.0, mutation_step=0.4, round_digits=4),
-        GeneRule(_max=1.0, _min=-1.0, mutation_step=0.4, round_digits=4),
-        GeneRule(_max=1.0, _min=-1.0, mutation_step=0.4, round_digits=4),
-    ]
-
     phenotype = ConfigurationDefaults.BEHAVIOR_VECTOR
 
     world_config = RectangularWorldConfig(
@@ -46,7 +39,7 @@ def main():
     TRAIN_LOCATION = "./train/aggregation"
     TEST_LOCATION = "./test/aggregation"
     TRAIN_FOR_EVERY_TEST = 4
-    TIMESTEPS = 1000
+    TIMESTEPS = 1500
 
     confirm_a = input(f"CONFIRM IO DESTINATIONS: {TRAIN_LOCATION} AND {TEST_LOCATION}")
 
