@@ -36,10 +36,10 @@ def main():
         screen=screen
     )
 
-    TRAIN_LOCATION = "./train/aggregation"
-    TEST_LOCATION = "./test/aggregation"
+    TRAIN_LOCATION = "./eval/eval"
+    TEST_LOCATION = "./eval/eval"
     TRAIN_FOR_EVERY_TEST = 4
-    TIMESTEPS = 1500
+    TIMESTEPS = 1000
 
     confirm_a = input(f"CONFIRM IO DESTINATIONS: {TRAIN_LOCATION} AND {TEST_LOCATION}")
 
