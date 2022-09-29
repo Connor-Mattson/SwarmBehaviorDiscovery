@@ -1,5 +1,7 @@
 runs/
 data/
+old-experiments
+checkpoints
 
 .coverage
 coverage.xml
