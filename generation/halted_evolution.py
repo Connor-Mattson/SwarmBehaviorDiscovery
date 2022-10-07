@@ -49,6 +49,7 @@ class HaltedEvolution:
             return None, None
 
         if self.behavior_discovery.curr_genome > 0 and self.behavior_discovery.curr_genome % self.evolve_config.population == 0:
+            print("Evolving Genomes")
             self.behavior_discovery.evolve()
             self.behavior_discovery.curr_genome = 0
 
@@ -63,8 +64,18 @@ class HaltedEvolution:
         self.behavior_discovery.curr_genome += 1
         return output, behavior, genome
 
+    def simulation(self, genome):
+        output, behavior = self.behavior_discovery.runSinglePopulation(
+            screen=None,
+            save=False,
+            genome=genome,
+            seed=self.world.seed,
+            output_config=self.output_configuration
+        )
+        return output, behavior
+
     @staticmethod
-    def defaultEvolver(steps=1200, evolve_population=100, k_samples=15):
+    def defaultEvolver(steps=1200, evolve_population=100, k_samples=15, n_agents=30):
         agent_config = ConfigurationDefaults.DIFF_DRIVE_AGENT
 
         genotype = [
@@ -78,7 +89,7 @@ class HaltedEvolution:
 
         world_config = RectangularWorldConfig(
             size=(500, 500),
-            n_agents=30,
+            n_agents=n_agents,
             behavior=phenotype,
             agentConfig=agent_config,
             padding=15

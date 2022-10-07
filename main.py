@@ -3,7 +3,6 @@ import torch
 from networks.encoder import AutoEncoderTrainer, BehaviorAutoEncoder
 encoder = BehaviorAutoEncoder()
 
-
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 try:
