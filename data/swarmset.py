@@ -21,7 +21,7 @@ def vecToCSVLine(vector):
     return line
 
 def CSVLineToVec(line):
-    line_list = line.strip().split(",")
+    line_list = line.strip().replace("\n", "").split(",")
     float_list = []
     for i in line_list:
         float_list.append(float(i))

@@ -6,13 +6,20 @@ class NoveltyEmbedding(torch.nn.Module):
     def __init__(self):
         super().__init__()
         self.s1 = torch.nn.Sequential(
+            torch.nn.Conv2d(1, 1, 5, stride=2, padding=2),
+            torch.nn.LeakyReLU(),
+            torch.nn.Conv2d(1, 1, 3, stride=2, padding=1),
+            torch.nn.LeakyReLU(),
+            torch.nn.Conv2d(1, 1, 3, stride=2, padding=1),
+            torch.nn.LeakyReLU(),
+            torch.nn.Flatten(),
+            torch.nn.Linear(3969, 1024),
+            torch.nn.ReLU(),
+            torch.nn.Linear(1024, 256),
+            torch.nn.ReLU(),
             torch.nn.Linear(256, 100),
             torch.nn.ReLU(),
-            torch.nn.Linear(100, 60),
-            torch.nn.ReLU(),
-            torch.nn.Linear(60, 20),
-            torch.nn.ReLU(),
-            torch.nn.Linear(20, 10),
+            torch.nn.Linear(100, 15),
         )
 
     def forward(self, x):
