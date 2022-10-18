@@ -3,7 +3,22 @@ import numpy as np
 import cv2
 
 class SimilarityGUI:
-    def __init__(self, anchor, subjects):
+    def __init__(self, anchor, subjects, keystrokes=None, labels=None):
+
+        self.keys = keystrokes
+        if self.keys is None:
+            self.keys = {
+                pygame.K_KP0: 0,
+                pygame.K_KP1: 1
+            }
+
+        self.labels = labels
+        if self.labels is None:
+            self.labels = {
+                0: "Same",
+                1: "Different"
+            }
+
         self.subject_s = None
         self.anchor_s = None
 
@@ -27,7 +42,8 @@ class SimilarityGUI:
         return cv2.resize(img, dsize=size, interpolation=cv2.INTER_CUBIC)
 
     def makeSurfaces(self):
-        self.anchor_s = pygame.surfarray.make_surface(self.resize(self.anchor, size=self.IMG_SIZE))
+        if self.anchor is not None:
+            self.anchor_s = pygame.surfarray.make_surface(self.resize(self.anchor, size=self.IMG_SIZE))
         self.subject_s = [pygame.surfarray.make_surface(self.resize(i, size=self.IMG_SIZE)) for i in self.subjects]
 
     def getIMGLocation(self, i):
@@ -50,7 +66,7 @@ class SimilarityGUI:
             if i == 0:
                 text = self.font.render("Anchor", True, (0, 0, 255), (255, 255, 255))
             else:
-                caption = "Same" if self.assignment[i - 1] == 0 else "Different"
+                caption = self.labels[self.assignment[i - 1]]
                 text = self.font.render(caption, True, (255, 0, 0), (255, 255, 255))
             textRect = text.get_rect()
             textRect.x = pos[0]
@@ -75,15 +91,14 @@ class SimilarityGUI:
                         self.selected = min(self.selected + 1, len(self.subjects))
                     if event.key == pygame.K_LEFT:
                         self.selected = max(self.selected - 1, 1)
-                    if event.key == pygame.K_KP1:
-                        self.assignment[self.selected - 1] = 1
-                    if event.key == pygame.K_KP0:
-                        self.assignment[self.selected - 1] = 0
+                    if event.key in self.keys:
+                        self.assignment[self.selected - 1] = self.keys[event.key]
                     if event.key == pygame.K_RETURN or event.key == pygame.K_KP_ENTER:
                         running = False
 
             self.screen.fill((0, 0, 0))
-            self.showImg(self.anchor_s, 0)
+            if self.anchor_s:
+                self.showImg(self.anchor_s, 0)
             for i, img in enumerate(self.subject_s):
                 self.showImg(img, i + 1)
 

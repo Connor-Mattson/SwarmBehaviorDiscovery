@@ -27,11 +27,11 @@ class NoveltyEmbedding(torch.nn.Module):
         return x
 
     def load_model(self, file_name="cp_NAME"):
-        checkpoint = torch.load(f"checkpoints/mixer/{file_name}.pt")
+        checkpoint = torch.load(f"checkpoints/embeddings/{file_name}.pt")
         self.load_state_dict(checkpoint["model_state_dict"])
 
     def save_model(self):
         file_name = f"cp_{round(time.time())}"
         torch.save({
             'model_state_dict': self.state_dict(),
-        }, f"checkpoints/mixer/{file_name}.pt")
+        }, f"checkpoints/embeddings/{file_name}.pt")
