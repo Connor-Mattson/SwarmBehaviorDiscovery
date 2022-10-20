@@ -10,6 +10,7 @@ from generation.halted_evolution import HaltedEvolution
 from PIL import Image
 import os
 import numpy as np
+import time
 
 def vecToCSVLine(vector):
     line = ""
@@ -27,6 +28,46 @@ def CSVLineToVec(line):
         float_list.append(float(i))
     float_list = np.array(float_list)
     return float_list
+
+class ContinuingDataset(Dataset):
+    def __init__(self, parent_dir):
+        folder_name = f"trial-{str(int(time.time()))}"
+        self.dir = parent_dir
+        self.base_path = os.path.join(parent_dir, folder_name)
+        self.image_path = os.path.join(self.base_path, "images")
+        self.context_path = os.path.join(self.base_path, "context")
+        os.mkdir(self.base_path)
+        os.mkdir(self.image_path)
+        os.mkdir(self.context_path)
+
+    def __len__(self):
+        return len(os.listdir(self.image_path))
+
+    def __getitem__(self, index):
+        if index >= len(self):
+            print(f"Attempted to Access item at index {index}, which is out of range")
+            index = len(self) - 1
+        image = np.array(Image.open(os.path.join(self.image_path, f"{index}.png")).convert('L'))
+        context_path = os.path.join(self.context_path, f"{index}.txt")
+        genome = None
+        behavior = None
+        with open(context_path, "r") as f:
+            try:
+                genome = CSVLineToVec(f.readline())
+                behavior = CSVLineToVec(f.readline())
+            except Exception as e:
+                print(f"Could not read genome from file at index {index}")
+        return image, genome, behavior
+
+    def new_entry(self, image, genome, behavior):
+        img_name = f"{len(self)}.png"
+        context_name = f"{len(self)}.txt"
+        img_path = os.path.join(self.image_path, img_name)
+        matplotlib.image.imsave(img_path, image, cmap='gray')
+        context_path = os.path.join(self.context_path, context_name)
+        with open(context_path, "x") as f:
+            f.write(vecToCSVLine(genome))
+            f.write(vecToCSVLine(behavior))
 
 class SwarmDataset(Dataset):
     def __init__(self, parent_dir, rank=0):
@@ -74,14 +115,15 @@ class SwarmDataset(Dataset):
     def set_rank(self, rank):
         self._rank = rank
 
-    def new_sample(self, image, genome, behavior):
+    def new_sample(self, image, genome, behavior=None):
         name = f"{len(self.data_folders)}"
         path = os.path.join(self.dir, name)
         os.mkdir(path)
         matplotlib.image.imsave(f'{path}/behavior.png', image, cmap='gray')
         with open(os.path.join(path, "context.txt"), "x") as f:
             f.write(vecToCSVLine(genome))
-            f.write(vecToCSVLine(behavior))
+            if behavior is not None:
+                f.write(vecToCSVLine(behavior))
         self.data_folders.append(path)
 
     def add_rank(self, index, item, is_array=False):
@@ -97,6 +139,7 @@ class SwarmDataset(Dataset):
             matplotlib.image.imsave(os.path.join(path, "decoded.png"), image, cmap='gray')
         else:
             raise Exception("You cannot call add image when a decoded image has already been called!")
+
 
 
 class DataBuilder:

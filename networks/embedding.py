@@ -1,6 +1,6 @@
 import torch
 import time
-
+import torchvision.transforms as T
 
 class NoveltyEmbedding(torch.nn.Module):
     def __init__(self):
@@ -35,3 +35,47 @@ class NoveltyEmbedding(torch.nn.Module):
         torch.save({
             'model_state_dict': self.state_dict(),
         }, f"checkpoints/embeddings/{file_name}.pt")
+
+    def network_from_numpy(self, anchor_img, pos_img, neg_img):
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        anchor_input = torch.from_numpy(anchor_img).to(device).float()
+        pos_input = torch.from_numpy(pos_img).to(device).float()
+        neg_input = torch.from_numpy(neg_img).to(device).float()
+
+        anchor_out = self.forward(anchor_input.unsqueeze(0))
+        pos_out = self.forward(pos_input.unsqueeze(0))
+        neg_out = self.forward(neg_input.unsqueeze(0))
+        return anchor_out, pos_out, neg_out
+
+    def batch_network_from_numpy(self, anchor_list, pos_list, neg_list):
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        anchor_input = torch.from_numpy(anchor_list).to(device).float()
+        pos_input = torch.from_numpy(pos_list).to(device).float()
+        neg_input = torch.from_numpy(neg_list).to(device).float()
+
+        anchor_out = self.forward(anchor_input)
+        pos_out = self.forward(pos_input)
+        neg_out = self.forward(neg_input)
+        return anchor_out, pos_out, neg_out
+
+    def network_with_transforms(self, anchor_list, pos_list, neg_list):
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        anchor_input = torch.from_numpy(anchor_list).to(device).float().unsqueeze(0)
+        pos_input = torch.from_numpy(pos_list).to(device).float().unsqueeze(0)
+        neg_input = torch.from_numpy(neg_list).to(device).float().unsqueeze(0)
+
+        affine_transformer = T.Compose([
+            T.ToPILImage(),
+            T.RandomAffine(degrees=(0, 360), translate=(0.1, 0.3), scale=(0.5, 0.75)),
+            T.ToTensor(),
+            T.Normalize(0.0, 1.0)
+        ])
+
+        anchor_input = affine_transformer(anchor_input).to(device)
+        pos_input = affine_transformer(pos_input).to(device)
+        neg_input = affine_transformer(neg_input).to(device)
+
+        anchor_out = self.forward(anchor_input)
+        pos_out = self.forward(pos_input)
+        neg_out = self.forward(neg_input)
+        return anchor_out, pos_out, neg_out

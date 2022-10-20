@@ -15,6 +15,8 @@ class DataAggregationArchive:
         self.archive = np.append(self.archive, scalars)
 
     def append(self, anchor, pos, neg):
+        if [anchor, pos, neg] in self.archive.tolist() or [pos, anchor, neg] in self.archive.tolist():
+            return
         if len(self.archive[0]) == 0:
             self.archive = np.array([[anchor, pos, neg]])
         else:
