@@ -11,6 +11,7 @@ from PIL import Image
 import os
 import numpy as np
 import time
+import random
 
 def vecToCSVLine(vector):
     line = ""
@@ -143,14 +144,18 @@ class SwarmDataset(Dataset):
 
 
 class DataBuilder:
-    def __init__(self, data_dir, is_anti=False, is_similar=False, fixed_a_b=False, steps=3000, agents=30):
+    def __init__(self, data_dir, is_anti=False, is_similar=False, fixed_a_b=False, steps=3000, agents=30, ev=None, screen=None):
         self.dataset = SwarmDataset(data_dir)
         self.is_anti = is_anti
         self.is_similar = is_similar
         self.fixed_a_b = fixed_a_b
         if len(self.dataset) > 0:
             raise Exception("Requested to build new dataset in folder that contains items")
-        self.evolution, self.screen = HaltedEvolution.defaultEvolver(steps=steps, n_agents=agents)
+
+        if not ev:
+            self.evolution, self.screen = HaltedEvolution.defaultEvolver(steps=steps, n_agents=agents)
+        else:
+            self.evolution, self.screen = ev, screen
 
     def create(self):
         TRIALS = 1
@@ -168,7 +173,7 @@ class DataBuilder:
             directions = [(1, 1), (1, -1), (-1, 1), (-1, -1)]
             if self.is_anti:
                 directions = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
-            for i in range(60, 100, 1):
+            for i in range(50, 100, 1):
                 a = (i * 0.01) - (0.11 if self.is_similar else 0)
                 b = (a - 0.2)
                 for off_d in directions:
@@ -179,19 +184,41 @@ class DataBuilder:
                                 continue
                         genome = [a * off_d[0], b * off_d[1], a * on_d[0], b * on_d[1]]
                         gene_pool.append(genome)
+
+        # Meshgrid size 4
+        # else:
+        #     DENSITY = 100
+        #     SAMPLE_SIZE = 5000
+        #     r_0_s = np.linspace(-1.0, 1.0, num=DENSITY)
+        #     r_1_s = np.linspace(-1.0, 1.0, num=DENSITY)
+        #     l_0_s = np.linspace(-1.0, 1.0, num=DENSITY)
+        #     l_1_s = np.linspace(-1.0, 1.0, num=DENSITY)
+        #
+        #     mesh = np.meshgrid(r_0_s, l_0_s, r_1_s, l_1_s)
+        #     genomes = np.array(mesh).T.reshape(-1, 4)
+        #     print(f"Size of Genome scope: {len(genomes)}")
+        #
+        #     index_sample = np.random.randint(len(genomes), size=SAMPLE_SIZE)
+        #     gene_pool = [genomes[i] for i in index_sample]
+
+
+        # Meshgrid size 10
         else:
-            DENSITY = 100
-            SAMPLE_SIZE = 10000
-            r_0_s = np.linspace(-1.0, 1.0, num=DENSITY)
-            r_1_s = np.linspace(-1.0, 1.0, num=DENSITY)
-            l_0_s = np.linspace(-1.0, 1.0, num=DENSITY)
-            l_1_s = np.linspace(-1.0, 1.0, num=DENSITY)
-
-            mesh = np.meshgrid(r_0_s, l_0_s, r_1_s, l_1_s)
-            genomes = np.array(mesh).T.reshape(-1, 4)
-            print(f"Size of Genome scope: {len(genomes)}")
-
-            index_sample = np.random.randint(len(genomes), size=SAMPLE_SIZE)
-            gene_pool = [genomes[i] for i in index_sample]
+            SAMPLE_SIZE = 5000
+            for _ in range(SAMPLE_SIZE):
+                gene_pool.append(
+                    [
+                        (random.random() * 2) - 1,
+                        (random.random() * 2) - 1,
+                        (random.random() * 2) - 1,
+                        (random.random() * 2) - 1,
+                        (random.random() * 2) - 1,
+                        (random.random() * 2) - 1,
+                        (random.random() * 2) - 1,
+                        (random.random() * 2) - 1,
+                        (random.random() * 2 * np.pi) - np.pi,
+                        (random.random() * 2 * np.pi) - np.pi,
+                    ]
+                )
 
         return gene_pool

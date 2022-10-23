@@ -3,7 +3,7 @@ import time
 import torchvision.transforms as T
 
 class NoveltyEmbedding(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, out_size=15):
         super().__init__()
         self.s1 = torch.nn.Sequential(
             torch.nn.Conv2d(1, 1, 5, stride=2, padding=2),
@@ -19,7 +19,7 @@ class NoveltyEmbedding(torch.nn.Module):
             torch.nn.ReLU(),
             torch.nn.Linear(256, 100),
             torch.nn.ReLU(),
-            torch.nn.Linear(100, 15),
+            torch.nn.Linear(100, out_size),
         )
 
     def forward(self, x):
@@ -66,14 +66,12 @@ class NoveltyEmbedding(torch.nn.Module):
 
         affine_transformer = T.Compose([
             T.ToPILImage(),
-            T.RandomAffine(degrees=(0, 360), translate=(0.1, 0.3), scale=(0.5, 0.75)),
+            T.RandomAffine(degrees=(0, 360), translate=(0.0, 0.02), scale=(0.9, 1.0)),
             T.ToTensor(),
-            T.Normalize(0.0, 1.0)
+            T.Normalize(0.0, 1.0),
         ])
 
-        anchor_input = affine_transformer(anchor_input).to(device)
         pos_input = affine_transformer(pos_input).to(device)
-        neg_input = affine_transformer(neg_input).to(device)
 
         anchor_out = self.forward(anchor_input)
         pos_out = self.forward(pos_input)

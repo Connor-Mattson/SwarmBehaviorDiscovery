@@ -16,7 +16,7 @@ import os
 import matplotlib
 
 class HIL:
-    def __init__(self, name=None, synthetic=False, data_limiter=2000):
+    def __init__(self, name=None, synthetic=False, data_limiter=2000, clusters=8):
         if not name:
             self.name = f"{str(int(time.time()))}"
         else:
@@ -25,6 +25,7 @@ class HIL:
         self.synthetic = synthetic
         self.synthetic_knowledge = None
         self.data_limiter = data_limiter
+        self.clusters=clusters
         print("HIL Init!")
 
     def medoid_accuracy(self, medoid_indices):
@@ -58,7 +59,7 @@ class HIL:
 
         return correct / total
 
-    def record_medoids(self, network, dataset):
+    def record_medoids(self, network, dataset, medoids=12):
         archive = ModifiedNoveltyArchieve()
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         network.eval()
@@ -70,7 +71,7 @@ class HIL:
             embedding = network(anchor_encoding.unsqueeze(0)).squeeze(0).cpu().detach().numpy()
             archive.addToArchive(vec=embedding, genome=genome)
 
-        kmedoids = KMedoids(n_clusters=8, random_state=0).fit(archive.archive)
+        kmedoids = KMedoids(n_clusters=medoids, random_state=0).fit(archive.archive)
         medoids = kmedoids.medoid_indices_
         labels = kmedoids.labels_
 
@@ -92,20 +93,23 @@ class HIL:
             f.write(text)
             f.close()
 
-        if not self.synthetic_knowledge:
-            self.synthetic_knowledge = self.syntheticBehaviorSpace(dataset)
+        if self.synthetic:
+            if not self.synthetic_knowledge:
+                self.synthetic_knowledge = self.syntheticBehaviorSpace(dataset)
 
-        print("Calculating Accuracy...")
-        medoid_accuracy = self.medoid_accuracy(medoids)
-        cluster_accuracy = self.clustering_accuracy(labels)
-        print(f"Medoid Accuracy: {medoid_accuracy}, Cluster Accuracy: {cluster_accuracy}")
-        return medoid_accuracy, cluster_accuracy
+            print("Calculating Accuracy...")
+            medoid_accuracy = self.medoid_accuracy(medoids)
+            cluster_accuracy = self.clustering_accuracy(labels)
+            print(f"Medoid Accuracy: {medoid_accuracy}, Cluster Accuracy: {cluster_accuracy}")
+            return medoid_accuracy, cluster_accuracy
+
+        return 0, 0
 
     def show_clusters(self, archive, auto_quit=False):
         agent_config = ConfigurationDefaults.DIFF_DRIVE_AGENT
         world_config = ConfigurationDefaults.RECTANGULAR_WORLD
         world_config.addAgentConfig(agent_config)
-        config = ResultsConfig(archive=archive, k_clusters=8, world_config=world_config, tsne_perplexity=8,
+        config = ResultsConfig(archive=archive, k_clusters=self.clusters, world_config=world_config, tsne_perplexity=8,
                                tsne_early_exaggeration=12, skip_tsne=False)
         gui = ClusteringGUI(config, auto_quit=auto_quit, output_folder_name=self.name)
         gui.displayGUI()
@@ -176,7 +180,7 @@ class HIL:
         SHOW_CLUSTERS = False
         RECORD_MEDOIDS = False
 
-        CLUSTERS = 8
+        CLUSTERS = self.clusters
         network.eval()
         archive = ModifiedNoveltyArchieve()
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -214,7 +218,7 @@ class HIL:
 
         print("Clustering Archive Size: ", len(archive.archive))
 
-        kmedoids = KMedoids(n_clusters=CLUSTERS, random_state=0).fit(archive.archive)
+        kmedoids = KMedoids(n_clusters=self.clusters, random_state=0).fit(archive.archive)
         labels = kmedoids.labels_
         medoids = kmedoids.medoid_indices_
 
