@@ -15,15 +15,15 @@ class ModifiedNoveltyArchieve(NoveltyArchive):
         super().__init__(max_size, pheno_file, geno_file)
         self.randoms = np.array([])
 
-    def getNovelty(self, k, vec):
-        # Compute with k = k + 1 because the value vec is in the archive space
-        distances = self.kNearestDistances(k + 1, vec)
-        random_novelty = sum(self.getKNearestRandoms(5, vec)) / 5
-        novelty_score = sum(distances) / k
-        ALPHA, BETA = 0.5, 0.5
-        blended_novelty = (ALPHA * novelty_score) + (BETA * random_novelty)
-        print(f"BLENDING: {blended_novelty}")
-        return blended_novelty
+    # def getNovelty(self, k, vec):
+    #     # Compute with k = k + 1 because the value vec is in the archive space
+    #     distances = self.kNearestDistances(k + 1, vec)
+    #     random_novelty = sum(self.getKNearestRandoms(5, vec)) / 5
+    #     novelty_score = sum(distances) / k
+    #     ALPHA, BETA = 0.5, 0.5
+    #     blended_novelty = (ALPHA * novelty_score) + (BETA * random_novelty)
+    #     print(f"BLENDING: {blended_novelty}")
+    #     return blended_novelty
 
     def setRandoms(self, random_archive):
         self.randoms = []
@@ -99,6 +99,10 @@ class ModifiedHaltingEvolution(HaltedEvolution):
         print(self.behavior_discovery.scores)
 
         self.behavior_discovery.evolve()
+
+    def saveArchive(self, name):
+        self.behavior_discovery.archive.saveArchive(f"{name}_b_")
+        self.behavior_discovery.archive.saveGenotypes(f"{name}_g_")
 
     def close(self):
         pass

@@ -31,15 +31,21 @@ def CSVLineToVec(line):
     return float_list
 
 class ContinuingDataset(Dataset):
-    def __init__(self, parent_dir):
-        folder_name = f"trial-{str(int(time.time()))}"
-        self.dir = parent_dir
-        self.base_path = os.path.join(parent_dir, folder_name)
-        self.image_path = os.path.join(self.base_path, "images")
-        self.context_path = os.path.join(self.base_path, "context")
-        os.mkdir(self.base_path)
-        os.mkdir(self.image_path)
-        os.mkdir(self.context_path)
+    def __init__(self, directory, create=True, folder_name=None):
+        if create:
+            folder_name = f"trial-{str(int(time.time()))}"
+            self.dir = directory
+            self.base_path = os.path.join(directory, folder_name)
+            self.image_path = os.path.join(self.base_path, "images")
+            self.context_path = os.path.join(self.base_path, "context")
+            os.mkdir(self.base_path)
+            os.mkdir(self.image_path)
+            os.mkdir(self.context_path)
+        else:
+            self.dir = directory
+            self.base_path = os.path.join(directory, folder_name)
+            self.image_path = os.path.join(self.base_path, "images")
+            self.context_path = os.path.join(self.base_path, "context")
 
     def __len__(self):
         return len(os.listdir(self.image_path))
@@ -204,7 +210,7 @@ class DataBuilder:
 
         # Meshgrid size 10
         else:
-            SAMPLE_SIZE = 5000
+            SAMPLE_SIZE = 10000
             for _ in range(SAMPLE_SIZE):
                 gene_pool.append(
                     [

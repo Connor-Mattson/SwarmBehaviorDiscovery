@@ -159,7 +159,7 @@ class HIL:
 
         return output
 
-    def getEmbeddedArchive(self, dataset, network):
+    def getEmbeddedArchive(self, dataset, network, concat_behavior=False):
         network.eval()
         archive = ModifiedNoveltyArchieve()
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -167,9 +167,13 @@ class HIL:
         for i in range(len(dataset)):
             if i > self.data_limiter:
                 break
-            anchor_encoding, genome = dataset[i][0], dataset[i][1]
+            anchor_encoding, genome, behavior = dataset[i]
             anchor_encoding = torch.from_numpy(anchor_encoding).to(device).float()
             embedding = network(anchor_encoding.unsqueeze(0)).squeeze(0).cpu().detach().numpy()
+
+            if concat_behavior:
+                embedding = np.concatenate((embedding, behavior))
+
             archive.addToArchive(vec=embedding, genome=genome)
 
         return archive
@@ -264,7 +268,7 @@ class HIL:
                                 neg_image = anchor_dataset[medoids[l]][0]
 
                                 optim.zero_grad()
-                                anchor_out, pos_out, neg_out = network.network_from_numpy(anchor_image, pos_image, neg_image)
+                                anchor_out, pos_out, neg_out = network.network_with_transforms(anchor_image, pos_image, neg_image)
 
                                 loss = loss_fn(anchor_out, pos_out, neg_out)
                                 avg_loss += loss.item()
@@ -317,7 +321,7 @@ class HIL:
                         neg_image = anchor_dataset[samples[neg_index]][0]
 
                         optim.zero_grad()
-                        anchor_out, pos_out, neg_out = network.network_from_numpy(anchor_image, pos_image, neg_image)
+                        anchor_out, pos_out, neg_out = network.network_with_transforms(anchor_image, pos_image, neg_image)
 
                         loss = loss_fn(anchor_out, pos_out, neg_out)
                         avg_loss += loss.item()
@@ -354,6 +358,8 @@ class HIL:
         for ancA, posA, negA in class_a:
             for ancB, posB, negB in class_b:
                 if posB != posA:
+                    out.append((ancA, posB, negA))
+                    out.append((ancB, posA, negB))
                     out.append((posA, posB, negA))
                     out.append((posB, posA, negB))
         return out

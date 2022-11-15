@@ -1,6 +1,8 @@
 import torch
 import time
 import torchvision.transforms as T
+from scipy import ndimage
+import numpy as np
 
 class NoveltyEmbedding(torch.nn.Module):
     def __init__(self, out_size=15):
@@ -58,22 +60,21 @@ class NoveltyEmbedding(torch.nn.Module):
         neg_out = self.forward(neg_input)
         return anchor_out, pos_out, neg_out
 
-    def network_with_transforms(self, anchor_list, pos_list, neg_list):
+    def network_with_transforms(self, anchor_img, pos_img, neg_img):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        anchor_input = torch.from_numpy(anchor_list).to(device).float().unsqueeze(0)
-        pos_input = torch.from_numpy(pos_list).to(device).float().unsqueeze(0)
-        neg_input = torch.from_numpy(neg_list).to(device).float().unsqueeze(0)
+        # anchor_input = torch.from_numpy(anchor_list).to(device).float().unsqueeze(0)
+        # pos_input = torch.from_numpy(pos_list).to(device).float().unsqueeze(0)
+        # neg_input = torch.from_numpy(neg_list).to(device).float().unsqueeze(0)
 
-        affine_transformer = T.Compose([
-            T.ToPILImage(),
-            T.RandomAffine(degrees=(0, 360), translate=(0.0, 0.02), scale=(0.9, 1.0)),
-            T.ToTensor(),
-            T.Normalize(0.0, 1.0),
+        pos_images = np.stack([
+            [ndimage.rotate(pos_img, 90)],
+            [ndimage.rotate(pos_img, 180)],
+            [ndimage.rotate(pos_img, 270)],
+            # ndimage.gaussian_filter(pos_img, 1),
+            # ndimage.gaussian_filter(pos_img, 3),
+            # ndimage.gaussian_filter(pos_img, 5),
         ])
 
-        pos_input = affine_transformer(pos_input).to(device)
-
-        anchor_out = self.forward(anchor_input)
-        pos_out = self.forward(pos_input)
-        neg_out = self.forward(neg_input)
-        return anchor_out, pos_out, neg_out
+        anchor_images = np.stack([[anchor_img] for _ in pos_images])
+        neg_images = np.stack([[neg_img] for _ in pos_images])
+        return self.batch_network_from_numpy(anchor_images, pos_images, neg_images)
