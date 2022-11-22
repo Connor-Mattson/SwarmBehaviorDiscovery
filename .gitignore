@@ -2,6 +2,7 @@ runs/
 data/
 old-experiments
 checkpoints
+NovelSwarmBehavior
 
 .coverage
 coverage.xml
