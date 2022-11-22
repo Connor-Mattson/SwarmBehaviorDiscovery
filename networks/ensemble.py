@@ -11,7 +11,7 @@ def init_weights_randomly(m):
 
 
 class Ensemble:
-    def __init__(self, size=3, output_size=16, init="Random", lr=1e-3, learning_decay=1.0, decay_step=5):
+    def __init__(self, size=3, output_size=16, init="Random", lr=1e-3, learning_decay=1.0, decay_step=5, margin=10.0):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.ensemble = [
             NoveltyEmbedding(out_size=output_size).to(self.device) for _ in range(size)
@@ -22,13 +22,14 @@ class Ensemble:
         self.schedulers = [
             torch.optim.lr_scheduler.StepLR(self.optimizers[i], step_size=decay_step, gamma=learning_decay) for i in range(size)
         ]
+        self.margin = margin
         if init == "Random":
             for network in self.ensemble:
                 network.apply(init_weights_randomly)
 
     def train_batch(self, anchor, positive, negative):
         self.training_mode()
-        loss_fn = torch.nn.TripletMarginLoss(margin=1.0)
+        loss_fn = torch.nn.TripletMarginLoss(margin=self.margin)
         losses = []
         for i, network in enumerate(self.ensemble):
             self.optimizers[i].zero_grad()
@@ -40,7 +41,7 @@ class Ensemble:
         return losses
 
     def eval_batch(self, anchor, positive, negative):
-        loss_fn = torch.nn.TripletMarginLoss(margin=1.0)
+        loss_fn = torch.nn.TripletMarginLoss(margin=self.margin)
         losses = []
         for i, network in enumerate(self.ensemble):
             anchor_out, pos_out, neg_out = network.batch_network_from_numpy(anchor, positive, negative)
@@ -75,7 +76,7 @@ class Ensemble:
                 [ndimage.rotate(anchor, 270)],
             ])
         else:
-            pos_images = [[positive]]
+            pos_images = np.array([[positive]])
 
         if negative is None:
             raise Exception("Negative must be included in a triplet evaluation")
@@ -95,12 +96,46 @@ class Ensemble:
                 return False
         return True
 
+    def binary_correct(self, anchor, positive=None, negative=None):
+        """
+        If ALL networks agree with the triplet, return True, else return False
+        """
+        losses = self.eval_triplet(anchor, positive, negative)
+        for i in range(0, len(losses)):
+            if losses[i] > 0.0:
+                return False
+        return True
+
+    def num_networks_correct(self, anchor, positive=None, negative=None):
+        """
+        Return the number of networks that agree with the triplet
+        """
+        losses = self.eval_triplet(anchor, positive, negative)
+        count = 0
+        for i in range(0, len(losses)):
+            if losses[i] == 0.0:
+                count += 1
+        return count
+
     def entropy_agreement(self, anchor, positive=None, negative=None):
+        """
+        Not a good metric of entropy - Deprecate Please
+        """
         losses = self.eval_triplet(anchor, positive, negative)
         # Softmax to get a probability distribution
         losses = torch.softmax(torch.tensor(losses), dim=0)
-        entropy = -sum([l * np.log2(l) for l in losses])
+        entropy = 0
+        for l in losses:
+            if l < 1e-4:
+                continue
+            entropy += (l * (np.log(1 / l)))
         return entropy
+
+    def variance(self, anchor, positive=None, negative=None):
+        losses = self.eval_triplet(anchor, positive, negative)
+        binary_out = [0.0 if i > 0.0 else 1.0 for i in losses]
+        P_t = sum(binary_out) / len(binary_out)
+        return P_t * (1 - P_t)
 
     def load_ensemble(self, in_folder, absolute=False):
         _dir = f"checkpoints/ensembles/{in_folder}"
