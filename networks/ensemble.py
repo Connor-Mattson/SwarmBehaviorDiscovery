@@ -1,3 +1,5 @@
+import random
+
 import torch
 import os
 import numpy as np
@@ -23,6 +25,10 @@ class Ensemble:
             torch.optim.lr_scheduler.StepLR(self.optimizers[i], step_size=decay_step, gamma=learning_decay) for i in range(size)
         ]
         self.margin = margin
+        self.losses = []
+        self.last_losses = []
+        self.learning_decay = learning_decay,
+        self.decay_step = decay_step
         if init == "Random":
             for network in self.ensemble:
                 network.apply(init_weights_randomly)
@@ -45,7 +51,7 @@ class Ensemble:
         losses = []
         for i, network in enumerate(self.ensemble):
             anchor_out, pos_out, neg_out = network.batch_network_from_numpy(anchor, positive, negative)
-            loss = loss_fn(anchor_out, pos_out, neg_out)
+            loss = loss_fn(anchor_out, pos_out, neg_out).item()
             losses.append(loss)
         return losses
 
@@ -65,7 +71,10 @@ class Ensemble:
 
         anchor_images = np.stack([[anchor] for _ in pos_images])
         neg_images = np.stack([[negative] for _ in pos_images])
-        return self.train_batch(anchor_images, pos_images, neg_images)
+
+
+        losses = self.train_batch(anchor_images, pos_images, neg_images)
+        return losses
         
     def eval_triplet(self, anchor, positive=None, negative=None):
         self.eval_mode()
@@ -131,6 +140,18 @@ class Ensemble:
             entropy += (l * (np.log(1 / l)))
         return entropy
 
+    def majority_belief(self, anchor, positive=None, negative=None):
+        """
+        Return True if the majority of the ensemble believes
+        """
+        losses = self.eval_triplet(anchor, positive, negative)
+        threshold = len(losses) / 2
+        curr = 0
+        for i in range(0, len(losses)):
+            if losses[i] == 0.0:
+                curr += 1
+        return curr > threshold, losses
+
     def variance(self, anchor, positive=None, negative=None):
         losses = self.eval_triplet(anchor, positive, negative)
         binary_out = [0.0 if i > 0.0 else 1.0 for i in losses]
@@ -164,3 +185,33 @@ class Ensemble:
     def step_schedulers(self):
         for scheduler in self.schedulers:
             scheduler.step()
+
+    def evaluate_lr(self, losses):
+        self.last_losses = self.losses
+        self.losses = losses
+        for l in range(len(losses)):
+            if len(self.last_losses) == 0:
+                continue
+            if losses[l] > 6.0:
+                continue
+            if losses[l] < self.last_losses[l]:
+                continue
+            self.schedulers[l].step()
+        return [scheduler.get_last_lr() for scheduler in self.schedulers]
+
+    def set_single_lr(self, index, lr, gamma):
+        self.optimizers[index] = torch.optim.Adam(self.ensemble[index].parameters(), lr=lr)
+        self.schedulers[index] = torch.optim.lr_scheduler.StepLR(self.optimizers[index], step_size=self.decay_step, gamma=gamma)
+
+    def set_lr(self, lr, gamma):
+        self.optimizers = [
+            torch.optim.Adam(self.ensemble[i].parameters(), lr=lr) for i in range(len(self.ensemble))
+        ]
+        self.schedulers = [
+            torch.optim.lr_scheduler.StepLR(self.optimizers[i], step_size=self.decay_step, gamma=gamma) for i in range(len(self.ensemble))
+        ]
+
+    def trim(self, index):
+        self.ensemble = self.ensemble[-index:]
+        self.schedulers = self.schedulers[-index:]
+        self.optimizers = self.optimizers[-index:]
