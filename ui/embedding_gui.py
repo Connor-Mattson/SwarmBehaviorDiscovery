@@ -12,7 +12,7 @@ from NovelSwarmBehavior.novel_swarms.config.ResultsConfig import ResultsConfig
 from NovelSwarmBehavior.novel_swarms.novelty.NoveltyArchive import NoveltyArchive
 
 
-class ClusteringGUI(Cluster):
+class EmbeddingGui(Cluster):
     def __init__(self, config: ResultsConfig, auto_quit=False, output_folder_name=None, clustering_type="kMedoids", cluster_after=False):
         self.c_type = clustering_type
         self.cluster_after = cluster_after
@@ -86,16 +86,4 @@ class ClusteringGUI(Cluster):
                                    self.MEDOID_RADIUS, width=0)
 
             pygame.display.flip()
-
-            if self.auto_quit and not saved:
-                par_dir = f"./data/clusters/{self.output_folder_name}"
-                if not os.path.isdir(par_dir):
-                    os.mkdir(par_dir)
-                screen = pygame.display.get_surface()
-                screen_capture = pygame.surfarray.array3d(screen)
-                name = len(os.listdir(par_dir))
-                im2 = Image.fromarray(screen_capture.astype(np.uint8))
-                im2.save(f'{par_dir}/epoch_{name}.png')
-                saved = True
-                self.running = False
 

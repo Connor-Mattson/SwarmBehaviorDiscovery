@@ -5,24 +5,40 @@ from scipy import ndimage
 import numpy as np
 
 class NoveltyEmbedding(torch.nn.Module):
-    def __init__(self, out_size=15):
+    def __init__(self, out_size=15, new_model=False):
         super().__init__()
-        self.s1 = torch.nn.Sequential(
-            torch.nn.Conv2d(1, 1, 5, stride=2, padding=2),
-            torch.nn.LeakyReLU(),
-            torch.nn.Conv2d(1, 1, 3, stride=2, padding=1),
-            torch.nn.LeakyReLU(),
-            torch.nn.Conv2d(1, 1, 3, stride=2, padding=1),
-            torch.nn.LeakyReLU(),
-            torch.nn.Flatten(),
-            torch.nn.Linear(3969, 1024),
-            torch.nn.ReLU(),
-            torch.nn.Linear(1024, 256),
-            torch.nn.ReLU(),
-            torch.nn.Linear(256, 100),
-            torch.nn.ReLU(),
-            torch.nn.Linear(100, out_size),
-        )
+        if new_model:
+            self.s1 = torch.nn.Sequential(
+                torch.nn.Conv2d(1, 1, 3, stride=1, padding=0),
+                torch.nn.LeakyReLU(),
+                torch.nn.Conv2d(1, 1, 3, stride=1, padding=0),
+                torch.nn.LeakyReLU(),
+                torch.nn.Conv2d(1, 1, 3, stride=1, padding=0),
+                torch.nn.LeakyReLU(),
+                torch.nn.Flatten(),
+                torch.nn.Linear(1936, 256),
+                torch.nn.ReLU(),
+                torch.nn.Linear(256, 64),
+                torch.nn.ReLU(),
+                torch.nn.Linear(64, out_size),
+            )
+        else:
+            self.s1 = torch.nn.Sequential(
+                torch.nn.Conv2d(1, 1, 5, stride=2, padding=2),
+                torch.nn.LeakyReLU(),
+                torch.nn.Conv2d(1, 1, 3, stride=2, padding=1),
+                torch.nn.LeakyReLU(),
+                torch.nn.Conv2d(1, 1, 3, stride=2, padding=1),
+                torch.nn.LeakyReLU(),
+                torch.nn.Flatten(),
+                torch.nn.Linear(3969, 1024),
+                torch.nn.ReLU(),
+                torch.nn.Linear(1024, 256),
+                torch.nn.ReLU(),
+                torch.nn.Linear(256, 100),
+                torch.nn.ReLU(),
+                torch.nn.Linear(100, out_size),
+            )
 
     def forward(self, x):
         x = self.s1(x)
@@ -37,6 +53,12 @@ class NoveltyEmbedding(torch.nn.Module):
         torch.save({
             'model_state_dict': self.state_dict(),
         }, f"checkpoints/embeddings/{file_name}.pt")
+
+    def numpy_single_pass(self, img):
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        prime = torch.from_numpy(img).to(device).float()
+        out = self.forward(prime.unsqueeze(0))
+        return out
 
     def network_from_numpy(self, anchor_img, pos_img, neg_img):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

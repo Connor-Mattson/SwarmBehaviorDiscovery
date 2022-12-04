@@ -13,14 +13,22 @@ def init_weights_randomly(m):
 
 
 class Ensemble:
-    def __init__(self, size=3, output_size=16, init="Random", lr=1e-3, learning_decay=1.0, decay_step=5, margin=10.0):
+    def __init__(self, size=3, output_size=16, init="Random", lr=1e-3, lr_series=None, learning_decay=1.0, decay_step=5, margin=10.0, threshold=10.0, weight_decay=0, new_model=False):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.ensemble = [
-            NoveltyEmbedding(out_size=output_size).to(self.device) for _ in range(size)
+            NoveltyEmbedding(out_size=output_size, new_model=new_model).to(self.device) for _ in range(size)
         ]
-        self.optimizers = [
-            torch.optim.Adam(self.ensemble[i].parameters(), lr=lr) for i in range(size)
-        ]
+
+        self.lr_series = lr_series
+        if lr_series is None:
+            self.optimizers = [
+                torch.optim.Adam(self.ensemble[i].parameters(), lr=lr, weight_decay=weight_decay) for i in range(size)
+            ]
+        else:
+            self.optimizers = [
+                torch.optim.Adam(self.ensemble[i].parameters(), lr=lr_series[i], weight_decay=weight_decay) for i in range(size)
+            ]
+
         self.schedulers = [
             torch.optim.lr_scheduler.StepLR(self.optimizers[i], step_size=decay_step, gamma=learning_decay) for i in range(size)
         ]
@@ -29,6 +37,7 @@ class Ensemble:
         self.last_losses = []
         self.learning_decay = learning_decay,
         self.decay_step = decay_step
+        self.scheduler_threshold = threshold
         if init == "Random":
             for network in self.ensemble:
                 network.apply(init_weights_randomly)
@@ -71,7 +80,6 @@ class Ensemble:
 
         anchor_images = np.stack([[anchor] for _ in pos_images])
         neg_images = np.stack([[negative] for _ in pos_images])
-
 
         losses = self.train_batch(anchor_images, pos_images, neg_images)
         return losses
@@ -148,7 +156,7 @@ class Ensemble:
         threshold = len(losses) / 2
         curr = 0
         for i in range(0, len(losses)):
-            if losses[i] == 0.0:
+            if losses[i] < self.margin:
                 curr += 1
         return curr > threshold, losses
 
@@ -183,21 +191,24 @@ class Ensemble:
             network.eval()
 
     def step_schedulers(self):
-        for scheduler in self.schedulers:
-            scheduler.step()
+        if self.schedulers:
+            for scheduler in self.schedulers:
+                scheduler.step()
 
     def evaluate_lr(self, losses):
-        self.last_losses = self.losses
-        self.losses = losses
-        for l in range(len(losses)):
-            if len(self.last_losses) == 0:
-                continue
-            if losses[l] > 6.0:
-                continue
-            if losses[l] < self.last_losses[l]:
-                continue
-            self.schedulers[l].step()
-        return [scheduler.get_last_lr() for scheduler in self.schedulers]
+        if self.schedulers:
+            self.last_losses = self.losses
+            self.losses = losses
+            for l in range(len(losses)):
+                if len(self.last_losses) == 0:
+                    continue
+                if losses[l] > self.scheduler_threshold:
+                    continue
+                if losses[l] < self.last_losses[l]:
+                    continue
+                self.schedulers[l].step()
+            return [scheduler.get_last_lr() for scheduler in self.schedulers]
+        return None
 
     def set_single_lr(self, index, lr, gamma):
         self.optimizers[index] = torch.optim.Adam(self.ensemble[index].parameters(), lr=lr)
@@ -207,6 +218,7 @@ class Ensemble:
         self.optimizers = [
             torch.optim.Adam(self.ensemble[i].parameters(), lr=lr) for i in range(len(self.ensemble))
         ]
+        self.schedulers = None
         self.schedulers = [
             torch.optim.lr_scheduler.StepLR(self.optimizers[i], step_size=self.decay_step, gamma=gamma) for i in range(len(self.ensemble))
         ]

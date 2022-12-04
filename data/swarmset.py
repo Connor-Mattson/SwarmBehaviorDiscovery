@@ -81,13 +81,13 @@ class SwarmDataset(Dataset):
         if not os.path.isdir(parent_dir):
             raise Exception("The provided Dataset Directory Does not exist")
         self.dir = parent_dir
-        self.data_folders = os.listdir(parent_dir)
-        to_remove = []
-        for i, obj in enumerate(self.data_folders):
-            subdir = os.path.join(parent_dir, obj)
-            if not os.path.isdir(subdir):
-                to_remove.append(i)
-            self.data_folders[i] = subdir
+        # self.data_folders = os.listdir(parent_dir)
+        # to_remove = []
+        # for i, obj in enumerate(self.data_folders):
+        #     subdir = os.path.join(parent_dir, obj)
+        #     if not os.path.isdir(subdir):
+        #         to_remove.append(i)
+        #     self.data_folders[i] = subdir
 
         ####
         # Remove to_removes eventually
@@ -96,10 +96,10 @@ class SwarmDataset(Dataset):
         self._rank = rank
 
     def __len__(self):
-        return len(self.data_folders)
+        return len(os.listdir(self.dir))
 
     def __getitem__(self, index):
-        folder = self.data_folders[index]
+        folder = os.path.join(self.dir, str(index))
         image = np.array(Image.open(os.path.join(folder, "behavior.png")).convert('L'))
         context_path = os.path.join(folder, "context.txt")
         with open(context_path, "r") as f:
@@ -123,7 +123,7 @@ class SwarmDataset(Dataset):
         self._rank = rank
 
     def new_sample(self, image, genome, behavior=None):
-        name = f"{len(self.data_folders)}"
+        name = f"{len(self)}"
         path = os.path.join(self.dir, name)
         os.mkdir(path)
         matplotlib.image.imsave(f'{path}/behavior.png', image, cmap='gray')
@@ -131,7 +131,7 @@ class SwarmDataset(Dataset):
             f.write(vecToCSVLine(genome))
             if behavior is not None:
                 f.write(vecToCSVLine(behavior))
-        self.data_folders.append(path)
+        # self.data_folders.append(path)
 
     def add_rank(self, index, item, is_array=False):
         with open(os.path.join(self.data_folders[index], "context.txt"), "a") as f:
