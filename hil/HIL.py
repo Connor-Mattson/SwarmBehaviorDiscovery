@@ -14,6 +14,7 @@ import time
 from PIL import Image
 import os
 import matplotlib
+import cv2
 
 class HIL:
     def __init__(self, name=None, synthetic=False, data_limiter=2000, clusters=8):
@@ -59,7 +60,7 @@ class HIL:
 
         return correct / total
 
-    def record_medoids(self, network, dataset, medoids=12):
+    def record_medoids(self, network, dataset, medoids=12, size=50):
         archive = ModifiedNoveltyArchieve()
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         network.eval()
@@ -67,6 +68,7 @@ class HIL:
             if i > self.data_limiter:
                 break
             anchor_encoding, genome = dataset[i][0], dataset[i][1]
+            anchor_encoding = self.resizeInput(anchor_encoding, size)
             anchor_encoding = torch.from_numpy(anchor_encoding).to(device).float()
             embedding = network(anchor_encoding.unsqueeze(0)).squeeze(0).cpu().detach().numpy()
             archive.addToArchive(vec=embedding, genome=genome)
@@ -116,7 +118,7 @@ class HIL:
         pygame.display.quit()
         pygame.quit()
 
-    def embed_and_cluster(self, network, dataset, auto_quit=False):
+    def embed_and_cluster(self, network, dataset, auto_quit=False, size=50):
         archive = ModifiedNoveltyArchieve()
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         network.eval()
@@ -124,6 +126,7 @@ class HIL:
             # if i > self.data_limiter:
             #     break
             anchor_encoding, genome = dataset[i][0], dataset[i][1]
+            anchor_encoding = self.resizeInput(anchor_encoding, size)
             anchor_encoding = torch.from_numpy(anchor_encoding).to(device).float()
             embedding = network(anchor_encoding.unsqueeze(0)).squeeze(0).cpu().detach().numpy()
             archive.addToArchive(vec=embedding, genome=genome)
@@ -159,7 +162,7 @@ class HIL:
 
         return output
 
-    def getEmbeddedArchive(self, dataset, network, concat_behavior=False):
+    def getEmbeddedArchive(self, dataset, network, concat_behavior=False, size=50):
         network.eval()
         archive = ModifiedNoveltyArchieve()
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -168,6 +171,7 @@ class HIL:
             if i > self.data_limiter:
                 break
             anchor_encoding, genome, behavior = dataset[i]
+            anchor_encoding = self.resizeInput(anchor_encoding, size)
             anchor_encoding = torch.from_numpy(anchor_encoding).to(device).float()
             embedding = network(anchor_encoding.unsqueeze(0)).squeeze(0).cpu().detach().numpy()
 
@@ -363,3 +367,8 @@ class HIL:
                     out.append((posA, posB, negA))
                     out.append((posB, posA, negB))
         return out
+
+    def resizeInput(self, X, w=200):
+        frame = X.astype(np.uint8)
+        resized = cv2.resize(frame, dsize=(w, w), interpolation=cv2.INTER_AREA)
+        return resized

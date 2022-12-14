@@ -50,9 +50,10 @@ class Ensemble:
             self.optimizers[i].zero_grad()
             anchor_out, pos_out, neg_out = network.batch_network_from_numpy(anchor, positive, negative)
             loss = loss_fn(anchor_out, pos_out, neg_out)
+            if loss.item() > 0:
+                loss.backward()
+                self.optimizers[i].step()
             losses.append(loss.item())
-            loss.backward()
-            self.optimizers[i].step()
         return losses
 
     def eval_batch(self, anchor, positive, negative):
@@ -166,14 +167,18 @@ class Ensemble:
         P_t = sum(binary_out) / len(binary_out)
         return P_t * (1 - P_t)
 
-    def load_ensemble(self, in_folder, absolute=False):
+    def load_ensemble(self, in_folder, absolute=False, full=False):
         _dir = f"checkpoints/ensembles/{in_folder}"
+        if full:
+            _dir = in_folder
         for i, network in enumerate(self.ensemble):
             checkpoint = torch.load(os.path.join(_dir, f"{i}.pt"))
             network.load_state_dict(checkpoint["model_state_dict"])
 
-    def save_ensemble(self, out_folder, absolute=False):
+    def save_ensemble(self, out_folder, absolute=False, full=False):
         _dir = f"checkpoints/ensembles/{out_folder}"
+        if full:
+            _dir = out_folder
         if not os.path.isdir(_dir):
             os.mkdir(_dir)
 
@@ -202,7 +207,7 @@ class Ensemble:
             for l in range(len(losses)):
                 if len(self.last_losses) == 0:
                     continue
-                if losses[l] > self.scheduler_threshold:
+                if self.scheduler_threshold and losses[l] > self.scheduler_threshold:
                     continue
                 if losses[l] < self.last_losses[l]:
                     continue
