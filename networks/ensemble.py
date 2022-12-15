@@ -13,25 +13,35 @@ def init_weights_randomly(m):
 
 
 class Ensemble:
-    def __init__(self, size=3, output_size=16, init="Random", lr=1e-3, lr_series=None, learning_decay=1.0, decay_step=5, margin=10.0, threshold=10.0, weight_decay=0, new_model=False):
+    def __init__(self,
+                 size=3,
+                 output_size=16,
+                 init="Random",
+                 lr=1e-3,
+                 learning_decay=1.0,
+                 decay_step=5,
+                 margin=10.0,
+                 threshold=10.0,
+                 weight_decay=0,
+                 new_model=False,
+                 manual_schedulers=True
+                ):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.ensemble = [
             NoveltyEmbedding(out_size=output_size, new_model=new_model).to(self.device) for _ in range(size)
         ]
 
-        self.lr_series = lr_series
-        if lr_series is None:
-            self.optimizers = [
-                torch.optim.Adam(self.ensemble[i].parameters(), lr=lr, weight_decay=weight_decay) for i in range(size)
+        self.optimizers = [
+            torch.optim.Adam(self.ensemble[i].parameters(), lr=lr, weight_decay=weight_decay) for i in range(size)
+            # torch.optim.SGD(self.ensemble[i].parameters(), lr=lr, momentum=0.9, weight_decay=weight_decay) for i in range(size)
+        ]
+
+        if manual_schedulers:
+            self.schedulers = [
+                torch.optim.lr_scheduler.StepLR(self.optimizers[i], step_size=decay_step, gamma=learning_decay) for i in range(size)
             ]
         else:
-            self.optimizers = [
-                torch.optim.Adam(self.ensemble[i].parameters(), lr=lr_series[i], weight_decay=weight_decay) for i in range(size)
-            ]
-
-        self.schedulers = [
-            torch.optim.lr_scheduler.StepLR(self.optimizers[i], step_size=decay_step, gamma=learning_decay) for i in range(size)
-        ]
+            self.schedulers = None
         self.margin = margin
         self.losses = []
         self.last_losses = []
@@ -84,7 +94,7 @@ class Ensemble:
 
         losses = self.train_batch(anchor_images, pos_images, neg_images)
         return losses
-        
+
     def eval_triplet(self, anchor, positive=None, negative=None):
         self.eval_mode()
         if positive is None:
