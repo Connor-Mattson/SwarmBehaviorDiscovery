@@ -27,7 +27,7 @@ class HaltedEvolution:
         self.behavior_discovery = BehaviorDiscovery(
             generations=evolution_config.generations,
             population_size=evolution_config.population,
-            genotype_rules=evolution_config.gene_rules,
+            genome_builder=evolution_config.gene_builder,
             crossover_rate=evolution_config.crossover_rate,
             mutation_rate=evolution_config.mutation_rate,
             lifespan=evolution_config.lifespan,
@@ -74,15 +74,17 @@ class HaltedEvolution:
         return output, behavior
 
     @staticmethod
-    def defaultEvolver(steps=1200, evolve_population=100, k_samples=15, n_agents=30):
+    def defaultEvolver(steps=1200, evolve_population=100, k_samples=15, n_agents=30, gene_builder=None):
         agent_config = ConfigurationDefaults.DIFF_DRIVE_AGENT
 
-        genotype = [
-            GeneRule(_max=1.0, _min=-1.0, mutation_step=0.4, round_digits=4),
-            GeneRule(_max=1.0, _min=-1.0, mutation_step=0.4, round_digits=4),
-            GeneRule(_max=1.0, _min=-1.0, mutation_step=0.4, round_digits=4),
-            GeneRule(_max=1.0, _min=-1.0, mutation_step=0.4, round_digits=4),
-        ]
+        genotype = None
+        if not gene_builder:
+            genotype = [
+                GeneRule(_max=1.0, _min=-1.0, mutation_step=0.4, round_digits=4),
+                GeneRule(_max=1.0, _min=-1.0, mutation_step=0.4, round_digits=4),
+                GeneRule(_max=1.0, _min=-1.0, mutation_step=0.4, round_digits=4),
+                GeneRule(_max=1.0, _min=-1.0, mutation_step=0.4, round_digits=4),
+            ]
 
         phenotype = ConfigurationDefaults.BEHAVIOR_VECTOR
 
@@ -95,6 +97,7 @@ class HaltedEvolution:
         )
 
         novelty_config = GeneticEvolutionConfig(
+            gene_builder=gene_builder,
             gene_rules=genotype,
             phenotype_config=phenotype,
             n_generations=100,
