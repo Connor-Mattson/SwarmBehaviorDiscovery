@@ -16,6 +16,7 @@ debugpy==1.6.3
 decorator==5.1.1
 defusedxml==0.7.1
 entrypoints==0.4
+exceptiongroup==1.1.0
 executing==1.0.0
 fastjsonschema==2.16.2
 fonttools==4.35.0
@@ -23,6 +24,7 @@ google-auth==2.11.1
 google-auth-oauthlib==0.4.6
 grpcio==1.49.1
 idna==3.4
+iniconfig==2.0.0
 ipykernel==6.15.3
 ipython==8.5.0
 ipython-genutils==0.2.0
@@ -62,6 +64,7 @@ parso==0.8.3
 pexpect==4.8.0
 pickleshare==0.7.5
 Pillow==9.2.0
+pluggy==1.0.0
 prometheus-client==0.14.1
 prompt-toolkit==3.0.31
 protobuf==3.19.5
@@ -75,6 +78,7 @@ pygame==2.1.2
 Pygments==2.13.0
 pyparsing==3.0.9
 pyrsistent==0.18.1
+pytest==7.2.1
 python-dateutil==2.8.2
 pyzmq==24.0.1
 qtconsole==5.3.2
@@ -95,6 +99,7 @@ tensorboard-plugin-wit==1.8.1
 terminado==0.15.0
 threadpoolctl==3.1.0
 tinycss2==1.1.1
+tomli==2.0.1
 torch==1.13.1
 torchaudio==0.12.1+cu116
 torchlars==0.1.2
