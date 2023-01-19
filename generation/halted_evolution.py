@@ -1,5 +1,6 @@
 import pygame
-
+import numpy as np
+from NovelSwarmBehavior.novel_swarms.cache.ExternalSimulationArchive import ExternalSimulationArchive
 from NovelSwarmBehavior.novel_swarms.novelty.BehaviorDiscovery import BehaviorDiscovery
 from NovelSwarmBehavior.novel_swarms.config.EvolutionaryConfig import GeneticEvolutionConfig
 from NovelSwarmBehavior.novel_swarms.config.WorldConfig import RectangularWorldConfig
@@ -35,6 +36,13 @@ class HaltedEvolution:
             behavior_config=evolution_config.behavior_config,
             k_neighbors=evolution_config.k,
         )
+        self.allow_external_archive = True
+        if self.allow_external_archive:
+            DEPTH = 4
+            BASE_DIRECTORY = "/home/connor/Desktop/Original_Capability_Archive"
+            assert DEPTH == len(evolution_config.gene_builder.rules)
+            self.external_archive = ExternalSimulationArchive(BASE_DIRECTORY, 4)
+
 
     def setup(self):
         print("Hello World!")
@@ -52,14 +60,22 @@ class HaltedEvolution:
             self.behavior_discovery.evolve()
             self.behavior_discovery.curr_genome = 0
 
-        output = self.behavior_discovery.runSinglePopulation(
-            screen=None,
-            i=self.behavior_discovery.curr_genome,
-            seed=self.world.seed,
-            output_config=self.output_configuration
-        )
-        behavior = self.behavior_discovery.behavior[self.behavior_discovery.curr_genome]
-        genome = self.behavior_discovery.population[self.behavior_discovery.curr_genome]
+        if self.allow_external_archive:
+            genome = self.behavior_discovery.population[self.behavior_discovery.curr_genome]
+            rounded_genome = self.round_genome(genome)
+            behavior, output = self.external_archive.retrieve_if_exists(rounded_genome, with_image=True)
+            print(f"We just utilized the archive: {rounded_genome}")
+        else:
+            output = self.behavior_discovery.runSinglePopulation(
+                screen=None,
+                i=self.behavior_discovery.curr_genome,
+                seed=self.world.seed,
+                output_config=self.output_configuration
+            )
+            behavior = self.behavior_discovery.behavior[self.behavior_discovery.curr_genome]
+            genome = self.behavior_discovery.population[self.behavior_discovery.curr_genome]
+            rounded_genome = self.round_genome(genome)
+            self.external_archive.save_if_empty(rounded_genome, behavior, image=output)
         self.behavior_discovery.curr_genome += 1
         return output, behavior, genome
 
@@ -72,6 +88,12 @@ class HaltedEvolution:
             output_config=self.output_configuration
         )
         return output, behavior
+
+    def round_genome(self, genome):
+        rounded = []
+        for i in genome:
+            rounded.append(round(i, 1) + 0.0)
+        return np.array(rounded)
 
     @staticmethod
     def defaultEvolver(steps=1200, evolve_population=100, k_samples=15, n_agents=30, gene_builder=None):

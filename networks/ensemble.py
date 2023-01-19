@@ -5,6 +5,7 @@ import os
 import numpy as np
 from networks.embedding import NoveltyEmbedding
 from scipy import ndimage
+from torchlars import LARS
 
 
 def init_weights_randomly(m):
@@ -32,20 +33,28 @@ class Ensemble:
         ]
 
         self.optimizers = [
-            torch.optim.Adam(self.ensemble[i].parameters(), lr=lr, weight_decay=weight_decay) for i in range(size)
+
+            LARS(
+                # optimizer=torch.optim.Adam(self.ensemble[i].parameters(), lr=lr, weight_decay=5e-4)
+                optimizer=torch.optim.SGD(self.ensemble[i].parameters(), lr=lr, momentum=0.9, weight_decay=5e-4),
+                eps=1e-8, trust_coef=0.001
+            ) for i in range(size)
             # torch.optim.SGD(self.ensemble[i].parameters(), lr=lr, momentum=0.9, weight_decay=weight_decay) for i in range(size)
         ]
 
         if manual_schedulers:
-            self.schedulers = [
-                torch.optim.lr_scheduler.StepLR(self.optimizers[i], step_size=decay_step, gamma=learning_decay) for i in range(size)
+            self.schedules = [
+                torch.optim.lr_scheduler.PolynomialLR(self.optimizers[i], total_iters=90, power=2.0, verbose=True) for i in range(size)
             ]
+            # self.schedulers = [
+            #     torch.optim.lr_scheduler.StepLR(self.optimizers[i], step_size=decay_step, gamma=learning_decay) for i in range(size)
+            # ]
         else:
             self.schedulers = None
         self.margin = margin
         self.losses = []
         self.last_losses = []
-        self.learning_decay = learning_decay,
+        self.learning_decay = learning_decay
         self.decay_step = decay_step
         self.scheduler_threshold = threshold
         if init == "Random":

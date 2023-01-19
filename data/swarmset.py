@@ -13,6 +13,7 @@ import os
 import numpy as np
 import time
 import random
+import cv2
 
 def vecToCSVLine(vector):
     line = ""
@@ -78,10 +79,11 @@ class ContinuingDataset(Dataset):
             f.write(vecToCSVLine(behavior))
 
 class SwarmDataset(Dataset):
-    def __init__(self, parent_dir, rank=0):
+    def __init__(self, parent_dir, rank=0, resize=None):
         if not os.path.isdir(parent_dir):
             raise Exception("The provided Dataset Directory Does not exist")
         self.dir = parent_dir
+        self.resize = resize
         # self.data_folders = os.listdir(parent_dir)
         # to_remove = []
         # for i, obj in enumerate(self.data_folders):
@@ -127,7 +129,12 @@ class SwarmDataset(Dataset):
         name = f"{len(self)}"
         path = os.path.join(self.dir, name)
         os.mkdir(path)
-        matplotlib.image.imsave(f'{path}/behavior.png', image, cmap='gray')
+        print(self.resize)
+        save_image = image
+        if self.resize:
+            frame = image.astype(np.uint8)
+            save_image = cv2.resize(frame, dsize=self.resize, interpolation=cv2.INTER_AREA)
+        matplotlib.image.imsave(f'{path}/behavior.png', save_image, cmap='gray')
         with open(os.path.join(path, "context.txt"), "x") as f:
             f.write(vecToCSVLine(genome))
             if behavior is not None:
@@ -142,17 +149,22 @@ class SwarmDataset(Dataset):
                 f.write(item)
 
     def add_image(self, index, image):
+        save_image = image
+        print(self.resize)
+        if self.resize:
+            frame = image.astype(np.uint8)
+            save_image = cv2.resize(frame, dsize=self.resize, interpolation=cv2.INTER_AREA)
         if self._rank == 0:
             path = self.data_folders[index]
-            matplotlib.image.imsave(os.path.join(path, "decoded.png"), image, cmap='gray')
+            matplotlib.image.imsave(os.path.join(path, "decoded.png"), save_image, cmap='gray')
         else:
             raise Exception("You cannot call add image when a decoded image has already been called!")
 
 
 
 class DataBuilder:
-    def __init__(self, data_dir, gene_builder=None, steps=3000, agents=30, ev=None, screen=None):
-        self.dataset = SwarmDataset(data_dir)
+    def __init__(self, data_dir, gene_builder=None, steps=3000, agents=30, ev=None, screen=None, resize=None):
+        self.dataset = SwarmDataset(data_dir, resize=resize)
 
         if len(self.dataset) > 0:
             raise Exception("Requested to build a new dataset in folder that contains items")
