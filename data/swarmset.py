@@ -169,14 +169,15 @@ class DataBuilder:
         if len(self.dataset) > 0:
             raise Exception("Requested to build a new dataset in folder that contains items")
 
-        if gene_builder is None or not isinstance(gene_builder, GeneBuilder):
+        if not ev and (gene_builder is None or not isinstance(gene_builder, GeneBuilder)):
             raise Exception("DataBuilder must be supplied with a GeneBuilder Configuration. See novel_swarms/novelty/GeneRule")
 
-        self.gene_builder = gene_builder
+
         if not ev:
             self.evolution, self.screen = HaltedEvolution.defaultEvolver(steps=steps, n_agents=agents, gene_builder=gene_builder)
         else:
             self.evolution, self.screen = ev, screen
+        self.gene_builder = self.evolution.behavior_discovery.gene_builder
 
     def create(self, sample_size=1000):
         TRIALS = 1

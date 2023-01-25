@@ -36,12 +36,13 @@ class HaltedEvolution:
             behavior_config=evolution_config.behavior_config,
             k_neighbors=evolution_config.k,
         )
-        self.allow_external_archive = True
+        self.allow_external_archive = False
         if self.allow_external_archive:
             DEPTH = 4
             BASE_DIRECTORY = "/home/connor/Desktop/Original_Capability_Archive"
             assert DEPTH == len(evolution_config.gene_builder.rules)
             self.external_archive = ExternalSimulationArchive(BASE_DIRECTORY, 4)
+        print(self.behavior_discovery.gene_builder)
 
 
     def setup(self):
