@@ -25,7 +25,10 @@ class Ensemble:
                  threshold=10.0,
                  weight_decay=0,
                  new_model=False,
-                 manual_schedulers=True
+                 manual_schedulers=True,
+                 total_epochs=100,
+                 warmup=10,
+                 dynamic_lr=False,
                 ):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.ensemble = [
@@ -38,10 +41,19 @@ class Ensemble:
             # torch.optim.SGD(self.ensemble[i].parameters(), lr=lr, momentum=0.9, weight_decay=weight_decay) for i in range(size)
         ]
 
+        self.dynamic_lr = dynamic_lr
         if manual_schedulers:
-            self.schedulers = [
-                torch.optim.lr_scheduler.PolynomialLR(self.optimizers[i], total_iters=100, power=2.0, verbose=True) for i in range(size)
-            ]
+            if dynamic_lr:
+                self.schedulers = [
+                    torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizers[i], 'min', min_lr=2e-3, factor=0.8, patience=12, verbose=True, threshold=5e-3) for i in range(size)
+                ]
+            else:
+                self.schedulers = [
+                    torch.optim.lr_scheduler.ChainedScheduler([
+                        torch.optim.lr_scheduler.LinearLR(self.optimizers[i], start_factor=0.01, total_iters=warmup),
+                        torch.optim.lr_scheduler.PolynomialLR(self.optimizers[i], power=1.5, total_iters=(total_epochs + warmup), verbose=True)
+                    ]) for i in range(size)
+                ]
             # self.schedulers = [
             #     torch.optim.lr_scheduler.StepLR(self.optimizers[i], step_size=decay_step, gamma=learning_decay) for i in range(size)
             # ]
@@ -67,7 +79,10 @@ class Ensemble:
             loss = loss_fn(anchor_out, pos_out, neg_out)
             if loss.item() > 0:
                 loss.backward()
-                self.optimizers[i].step()
+                if self.dynamic_lr:
+                    self.optimizers[i].step()
+                else:
+                    self.optimizers[i].step()
             losses.append(loss.item())
         return losses
 
@@ -210,10 +225,13 @@ class Ensemble:
         for network in self.ensemble:
             network.eval()
 
-    def step_schedulers(self):
+    def step_schedulers(self, losses=None):
         if self.schedulers:
-            for scheduler in self.schedulers:
-                scheduler.step()
+            for i, scheduler in enumerate(self.schedulers):
+                if self.dynamic_lr and losses is not None:
+                    scheduler.step(losses[i])
+                else:
+                    scheduler.step()
 
     def evaluate_lr(self, losses):
         if self.schedulers:
@@ -229,7 +247,6 @@ class Ensemble:
                 self.schedulers[l].step()
             return [scheduler.get_last_lr() for scheduler in self.schedulers]
         return None
-
     def set_single_lr(self, index, lr, gamma):
         self.optimizers[index] = torch.optim.Adam(self.ensemble[index].parameters(), lr=lr)
         self.schedulers[index] = torch.optim.lr_scheduler.StepLR(self.optimizers[index], step_size=self.decay_step, gamma=gamma)
@@ -242,6 +259,12 @@ class Ensemble:
         self.schedulers = [
             torch.optim.lr_scheduler.StepLR(self.optimizers[i], step_size=self.decay_step, gamma=gamma) for i in range(len(self.ensemble))
         ]
+
+    def get_lr(self):
+        lrs = []
+        for scheduler in self.schedulers:
+            lrs.append(scheduler.optimizer.param_groups[0]['lr'])
+        return lrs
 
     def trim(self, index):
         self.ensemble = self.ensemble[-index:]
