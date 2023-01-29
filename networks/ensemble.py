@@ -35,8 +35,13 @@ class Ensemble:
             NoveltyEmbedding(out_size=output_size, new_model=new_model).to(self.device) for _ in range(size)
         ]
 
+        if not isinstance(lr, list):
+            self.lr = [lr for i in range(size)]
+        else:
+            self.lr = lr
+
         self.optimizers = [
-            torch.optim.Adam(self.ensemble[i].parameters(), lr=lr, eps=1e-6) for i in range(len(self.ensemble))
+            torch.optim.Adam(self.ensemble[i].parameters(), lr=self.lr[i], eps=1e-6) for i in range(len(self.ensemble))
             # LARS(self.ensemble[i].parameters(), lr, momentum=0.9, weight_decay=5e-4, eta=0.001, epsilon=1e-3, nesterov=True) for i in range(size)
             # torch.optim.SGD(self.ensemble[i].parameters(), lr=lr, momentum=0.9, weight_decay=weight_decay) for i in range(size)
         ]
@@ -45,7 +50,7 @@ class Ensemble:
         if manual_schedulers:
             if dynamic_lr:
                 self.schedulers = [
-                    torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizers[i], 'min', min_lr=2e-3, factor=0.8, patience=12, verbose=True, threshold=5e-3) for i in range(size)
+                    torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizers[i], 'min', min_lr=2e-3, factor=0.9, patience=15, verbose=True, threshold=5e-3) for i in range(size)
                 ]
             else:
                 self.schedulers = [
