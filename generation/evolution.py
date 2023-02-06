@@ -66,10 +66,10 @@ class ModifiedHaltingEvolution(HaltedEvolution):
             i=self.behavior_discovery.curr_genome,
             seed=self.world.seed,
             output_config=self.output_configuration,
-            save=False
+            save=True
         )
-
         genome = self.behavior_discovery.population[self.behavior_discovery.curr_genome]
+
         self.behavior_discovery.curr_genome += 1
         return output, genome, behavior
 
@@ -87,9 +87,10 @@ class ModifiedHaltingEvolution(HaltedEvolution):
     def overwriteBehavior(self, behavior):
         self.behavior_discovery.behavior = behavior
 
-    def overwriteArchive(self, archive, randoms):
+    def overwriteArchive(self, archive, randoms=None):
         self.behavior_discovery.archive = archive
-        self.behavior_discovery.archive.setRandoms(randoms)
+        if randoms is not None:
+            self.behavior_discovery.archive.setRandoms(randoms)
 
     def evolve(self):
         self.behavior_discovery.curr_genome = 0

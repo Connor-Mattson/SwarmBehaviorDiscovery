@@ -35,13 +35,8 @@ class HaltedEvolution:
             world_config=world,
             behavior_config=evolution_config.behavior_config,
             k_neighbors=evolution_config.k,
+            allow_external_archive=evolution_config.use_external_archive,
         )
-        self.allow_external_archive = False
-        if self.allow_external_archive:
-            DEPTH = 4
-            BASE_DIRECTORY = "/home/connor/Desktop/Original_Capability_Archive"
-            assert DEPTH == len(evolution_config.gene_builder.rules)
-            self.external_archive = ExternalSimulationArchive(BASE_DIRECTORY, 4)
         print(self.behavior_discovery.gene_builder)
 
 
@@ -54,29 +49,21 @@ class HaltedEvolution:
     def next(self):
         if self.behavior_discovery.curr_generation > 0 and self.behavior_discovery.curr_generation % self.evolve_config.generations == 0:
             print("Evolution Concluded")
-            return None, None
+            return None, None, None
 
         if self.behavior_discovery.curr_genome > 0 and self.behavior_discovery.curr_genome % self.evolve_config.population == 0:
             print("Evolving Genomes")
             self.behavior_discovery.evolve()
             self.behavior_discovery.curr_genome = 0
 
-        if self.allow_external_archive:
-            genome = self.behavior_discovery.population[self.behavior_discovery.curr_genome]
-            rounded_genome = self.round_genome(genome)
-            behavior, output = self.external_archive.retrieve_if_exists(rounded_genome, with_image=True)
-            print(f"We just utilized the archive: {rounded_genome}")
-        else:
-            output = self.behavior_discovery.runSinglePopulation(
-                screen=None,
-                i=self.behavior_discovery.curr_genome,
-                seed=self.world.seed,
-                output_config=self.output_configuration
-            )
-            behavior = self.behavior_discovery.behavior[self.behavior_discovery.curr_genome]
-            genome = self.behavior_discovery.population[self.behavior_discovery.curr_genome]
-            rounded_genome = self.round_genome(genome)
-            self.external_archive.save_if_empty(rounded_genome, behavior, image=output)
+        output = self.behavior_discovery.runSinglePopulation(
+            screen=None,
+            i=self.behavior_discovery.curr_genome,
+            seed=self.world.seed,
+            output_config=self.output_configuration
+        )
+        behavior = self.behavior_discovery.behavior[self.behavior_discovery.curr_genome]
+        genome = self.behavior_discovery.population[self.behavior_discovery.curr_genome]
         self.behavior_discovery.curr_genome += 1
         return output, behavior, genome
 
