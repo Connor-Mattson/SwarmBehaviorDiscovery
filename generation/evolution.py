@@ -66,7 +66,7 @@ class ModifiedHaltingEvolution(HaltedEvolution):
             i=self.behavior_discovery.curr_genome,
             seed=self.world.seed,
             output_config=self.output_configuration,
-            save=True
+            save=False
         )
         genome = self.behavior_discovery.population[self.behavior_discovery.curr_genome]
 
