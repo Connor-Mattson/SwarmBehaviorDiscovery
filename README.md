@@ -25,19 +25,19 @@ We use a custom swarm simulator to parameterize agents and environments. See thi
 Requires directory 'data' at project root.
 See `generate_trajectories.ipynb` for cells that allow you to define a robot model, genomes, and output directory to output data.
 
-OR see latest releases for an example dataset to examine: "gecco-filtered-two-sensor.zip", this file should be unzipped in the top-level "data" folder.
+OR see [latest releases](https://github.com/Connor-Mattson/SwarmBehaviorDiscovery/releases/tag/v0.1.0-alpha) for an example dataset to examine: "gecco-filtered-two-sensor.zip", this file should be unzipped in the top-level "data" folder.
 
 ## Self-Supervised Learning (Contrastive Learning)
 Requires a Contrastive Learning Dataset, generated from the previous file
 see `pretraining.ipynb`
 
-OR see latest releases for model parameters of self-supervised training alone: "Two-Sensor-Self-Supervised-Models.zip"
+OR see [latest releases](https://github.com/Connor-Mattson/SwarmBehaviorDiscovery/releases/tag/v0.1.0-alpha) for model parameters of self-supervised training alone: "Two-Sensor-Self-Supervised-Models.zip"
 
 ## Human-in-the-loop (HIL) Learning
 Should be performed after Pretraining to replicate our results
 see `hil-training.ipynb`
 
-OR see latest releases for model parameters of HIL training on top of self-supervised learning: "Two-Sensor-HIL-Models.zip"
+OR see [latest releases](https://github.com/Connor-Mattson/SwarmBehaviorDiscovery/releases/tag/v0.1.0-alpha) for model parameters of HIL training on top of self-supervised learning: "Two-Sensor-HIL-Models.zip"
 
 ## Novelty Search and Evolution
 Requires a saved PyTorch Checkpoint containing training weights
