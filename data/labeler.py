@@ -2,13 +2,13 @@ import time
 
 import pygame
 import matplotlib.image
-from NovelSwarmBehavior.novel_swarms.config.EvolutionaryConfig import GeneticEvolutionConfig
-from NovelSwarmBehavior.novel_swarms.config.OutputTensorConfig import OutputTensorConfig
-from NovelSwarmBehavior.novel_swarms.config.WorldConfig import RectangularWorldConfig
-from NovelSwarmBehavior.novel_swarms.config.defaults import ConfigurationDefaults
-from NovelSwarmBehavior.novel_swarms.novelty.GeneRule import GeneRule
-from NovelSwarmBehavior.novel_swarms.util.datasets.GenomeDataSet import GenomeDataSet
-from NovelSwarmBehavior.novel_swarms.world.WorldFactory import WorldFactory
+from novel_swarms.config.EvolutionaryConfig import GeneticEvolutionConfig
+from novel_swarms.config.OutputTensorConfig import OutputTensorConfig
+from novel_swarms.config.WorldConfig import RectangularWorldConfig
+from novel_swarms.config.defaults import ConfigurationDefaults
+from novel_swarms.novelty.GeneRule import GeneRule
+from novel_swarms.util.datasets.GenomeDataSet import GenomeDataSet
+from novel_swarms.world.WorldFactory import WorldFactory
 from generation.halted_evolution import HaltedEvolution
 
 

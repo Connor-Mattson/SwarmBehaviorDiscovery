@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from matplotlib import image
 from torchvision.io import read_image
 from generation.halted_evolution import HaltedEvolution
-from NovelSwarmBehavior.novel_swarms.novelty.GeneRule import GeneBuilder
+from novel_swarms.novelty.GeneRule import GeneBuilder
 from PIL import Image
 import os
 import numpy as np
