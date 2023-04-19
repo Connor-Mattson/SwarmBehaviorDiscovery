@@ -10,7 +10,7 @@ import time
 import torchvision
 from torchvision import datasets, transforms
 
-from generation.halted_evolution import HaltedEvolution
+from src.generation.halted_evolution import HaltedEvolution
 
 class BehaviorAutoEncoder(torch.nn.Module):
     def __init__(self):

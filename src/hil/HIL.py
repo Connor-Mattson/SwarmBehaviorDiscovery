@@ -3,13 +3,13 @@ import pygame
 import torch
 from sklearn_extra.cluster import KMedoids
 import numpy as np
-from generation.evolution import ModifiedNoveltyArchieve
-from ui.class_similarity import SimilarityGUI
-from networks.archive import DataAggregationArchive
+from src.generation.evolution import ModifiedNoveltyArchieve
+from src.ui.class_similarity import SimilarityGUI
+from src.networks.archive import DataAggregationArchive
 from novel_swarms.config.defaults import ConfigurationDefaults
 from novel_swarms.novelty.NoveltyArchive import NoveltyArchive
 from novel_swarms.config.ResultsConfig import ResultsConfig
-from ui.clustering_gui import ClusteringGUI
+from src.ui.clustering_gui import ClusteringGUI
 import time
 from PIL import Image
 import os

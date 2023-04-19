@@ -1,6 +1,6 @@
 import pygame
 import torch
-from networks.encoder import AutoEncoderTrainer, BehaviorAutoEncoder
+from src.networks.encoder import AutoEncoderTrainer, BehaviorAutoEncoder
 encoder = BehaviorAutoEncoder()
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

@@ -4,7 +4,7 @@ from novel_swarms.config.defaults import ConfigurationDefaults
 from novel_swarms.novelty.GeneRule import GeneRule
 from novel_swarms.config.OutputTensorConfig import OutputTensorConfig
 import numpy as np
-from generation.halted_evolution import HaltedEvolution
+from src.generation.halted_evolution import HaltedEvolution
 from novel_swarms.novelty.NoveltyArchive import NoveltyArchive
 import cv2
 import pygame

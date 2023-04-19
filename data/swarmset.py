@@ -6,7 +6,7 @@ from torchvision.transforms import ToTensor
 import matplotlib.pyplot as plt
 from matplotlib import image
 from torchvision.io import read_image
-from generation.halted_evolution import HaltedEvolution
+from src.generation.halted_evolution import HaltedEvolution
 from novel_swarms.novelty.GeneRule import GeneBuilder
 from PIL import Image
 import os

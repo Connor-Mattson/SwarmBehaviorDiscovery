@@ -3,9 +3,9 @@ import random
 import torch
 import os
 import numpy as np
-from networks.embedding import NoveltyEmbedding
+from src.networks.embedding import NoveltyEmbedding
 from scipy import ndimage
-from networks.lars import LARS
+from src.networks.lars import LARS
 
 
 def init_weights_randomly(m):

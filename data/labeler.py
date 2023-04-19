@@ -9,7 +9,7 @@ from novel_swarms.config.defaults import ConfigurationDefaults
 from novel_swarms.novelty.GeneRule import GeneRule
 from novel_swarms.util.datasets.GenomeDataSet import GenomeDataSet
 from novel_swarms.world.WorldFactory import WorldFactory
-from generation.halted_evolution import HaltedEvolution
+from src.generation.halted_evolution import HaltedEvolution
 
 
 def main():
