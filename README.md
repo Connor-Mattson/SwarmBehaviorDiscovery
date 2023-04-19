@@ -3,6 +3,7 @@ Contributors: Connor Mattson, Daniel S. Brown
 
 ## Required Software
 - Python & Pip
+- Jupyter Notebook
 - External Python Packages as defined in [requirements.txt](requirements.txt) 
 
 ## Setup
