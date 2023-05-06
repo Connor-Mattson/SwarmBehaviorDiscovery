@@ -82,6 +82,12 @@ class NoveltyEmbedding(torch.nn.Module):
         neg_out = self.forward(neg_input)
         return anchor_out, pos_out, neg_out
 
+    def forward_batch(self, data):
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        anchor_input = torch.from_numpy(data).to(device).float()
+        anchor_out = self.forward(anchor_input)
+        return anchor_out
+
     def network_with_transforms(self, anchor_img, pos_img, neg_img):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         # anchor_input = torch.from_numpy(anchor_list).to(device).float().unsqueeze(0)
