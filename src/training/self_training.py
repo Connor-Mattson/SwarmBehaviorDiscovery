@@ -119,7 +119,7 @@ def pretraining(data, network, data_cutoff=None, update_count=6):
         data_cutoff = len(data) - 1
 
     # BATCH_SIZE = 4096
-    BATCH_SIZE = 1024
+    BATCH_SIZE = 2048
     samples = np.random.random_integers(0, data_cutoff, (BATCH_SIZE * update_count))
     total_loss = 0.0
     total_updates = 0

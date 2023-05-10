@@ -84,18 +84,6 @@ class SwarmDataset(Dataset):
             raise Exception("The provided Dataset Directory Does not exist")
         self.dir = parent_dir
         self.resize = resize
-        # self.data_folders = os.listdir(parent_dir)
-        # to_remove = []
-        # for i, obj in enumerate(self.data_folders):
-        #     subdir = os.path.join(parent_dir, obj)
-        #     if not os.path.isdir(subdir):
-        #         to_remove.append(i)
-        #     self.data_folders[i] = subdir
-
-        ####
-        # Remove to_removes eventually
-        ####
-
         self._rank = rank
 
     def __len__(self):

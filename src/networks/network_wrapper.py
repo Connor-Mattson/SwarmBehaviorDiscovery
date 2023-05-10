@@ -118,6 +118,10 @@ class NetworkWrapper:
         checkpoint = torch.load(os.path.join(_dir, f"{name}.pt"))
         self.network.load_state_dict(checkpoint["model_state_dict"])
 
+    def load_from_path(self, path):
+        checkpoint = torch.load(path)
+        self.network.load_state_dict(checkpoint["model_state_dict"])
+
     def save(self, out_folder, name):
         _dir = out_folder
         if not os.path.isdir(_dir):

@@ -5,11 +5,20 @@ from novel_swarms.novelty.GeneRule import GeneBuilder, GeneRule
 from novel_swarms.sensors.SensorSet import SensorSet
 from novel_swarms.sensors.BinaryLOSSensor import BinaryLOSSensor
 from novel_swarms.sensors.GenomeDependentSensor import GenomeBinarySensor
+from novel_swarms.config.OutputTensorConfig import OutputTensorConfig
+from novel_swarms.config.AgentConfig import DiffDriveAgentConfig
+from novel_swarms.config.WorldConfig import RectangularWorldConfig
+from novel_swarms.config.defaults import ConfigurationDefaults
 import numpy as np
 
 ROBOT_TYPES = frozenset([
-    "single-sensor",
-    "two-sensor"
+    "single_sensor",
+    "two_sensor"
+])
+
+STRATEGY_TYPES = frozenset([
+    "Mattson_and_Brown",
+    "Brown_et_al"
 ])
 
 # Note: Not Immutable
@@ -50,4 +59,33 @@ TWO_SENSOR_GENE_MODEL = GeneBuilder(
     ]
 )
 
+DEFAULT_OUTPUT_CONFIG = OutputTensorConfig(
+    timeless=True,
+    total_frames=80,
+    steps_between_frames=2,
+    screen=None
+)
 
+TWO_SENSOR_AGENT_CONFIG = DiffDriveAgentConfig(
+    sensors=SensorSet([
+        BinaryLOSSensor(angle=0),
+        GenomeBinarySensor(genome_id=8)
+    ]),
+)
+
+SINGLE_SENSOR_AGENT_CONFIG = ConfigurationDefaults.DIFF_DRIVE_AGENT
+
+TWO_SENSOR_WORLD_CONFIG = RectangularWorldConfig(
+    size=(500, 500),
+    behavior=ConfigurationDefaults.BEHAVIOR_VECTOR,
+    agentConfig=TWO_SENSOR_AGENT_CONFIG,
+    padding=15,
+
+)
+
+SINGLE_SENSOR_WORLD_CONFIG = RectangularWorldConfig(
+    size=(500, 500),
+    behavior=ConfigurationDefaults.BEHAVIOR_VECTOR,
+    agentConfig=SINGLE_SENSOR_AGENT_CONFIG,
+    padding=15
+)
