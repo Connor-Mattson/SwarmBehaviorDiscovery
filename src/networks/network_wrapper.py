@@ -25,16 +25,26 @@ class NetworkWrapper:
                  total_epochs=100,
                  warmup=10,
                  dynamic_lr=False,
+                 network=None,
+                 only_features=False,
                 ):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.network = NoveltyEmbedding(out_size=output_size, new_model=new_model).to(self.device)
+
+        if network is None:
+            self.network = NoveltyEmbedding(out_size=output_size, new_model=new_model).to(self.device)
+        else:
+            self.network = network.to(self.device)
+
         self.lr = lr
-        self.optimizer = torch.optim.Adam(self.network.parameters(), lr=self.lr, eps=1e-6)
+        self.only_features = only_features
+        self.create_optimizer()
+
         self.dynamic_lr = dynamic_lr
 
         if manual_schedulers:
             if dynamic_lr:
-                self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', min_lr=2e-3, factor=0.9, patience=15, verbose=True, threshold=5e-3)
+                # self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', min_lr=2e-4,factor=0.9, patience=15, verbose=True,threshold=5e-3)
+                self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', min_lr=2e-4, factor=0.75, patience=10, verbose=True, threshold=5e-3)
             else:
                 self.scheduler = torch.optim.lr_scheduler.ChainedScheduler([
                         torch.optim.lr_scheduler.LinearLR(self.optimizer, start_factor=0.01, total_iters=warmup),
@@ -136,6 +146,12 @@ class NetworkWrapper:
     def eval_mode(self):
         self.network.eval()
 
+    def create_optimizer(self, lr=None):
+        if self.only_features:
+            self.optimizer = torch.optim.Adam(self.network.encoder.parameters(), lr=self.lr if lr is None else lr, eps=1e-6)
+        else:
+            self.optimizer = torch.optim.Adam(self.network.parameters(), lr=self.lr if lr is None else lr, eps=1e-6)
+
     def step_scheduler(self, loss=None):
         if self.scheduler:
             if self.dynamic_lr and loss is not None:
@@ -159,7 +175,7 @@ class NetworkWrapper:
     #     return None
 
     def set_lr(self, lr, gamma):
-        self.optimizer = torch.optim.Adam(self.network.parameters(), lr=lr)
+        self.create_optimizer(lr)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.decay_step, gamma=gamma)
 
     def get_lr(self):

@@ -3,7 +3,7 @@ import time
 import random
 from absl import logging
 from data.swarmset import ContinuingDataset, SwarmDataset
-from src.networks.embedding import NoveltyEmbedding
+from src.networks.embedding import NoveltyEmbedding, ResNetEmbedding
 from src.networks.archive import DataAggregationArchive
 from src.networks.network_wrapper import NetworkWrapper
 import numpy as np
@@ -97,6 +97,11 @@ def getRandomTransformation(image, k=2):
         image = image.squeeze(0).numpy()
     return image
 
+def random_negative_mining(samples):
+    negatives = []
+    for _ in samples:
+        negatives.append(random.randint(0, len(samples) - 1))
+    return negatives
 
 def triplet_negative_mining(anchor_embeddings, positive_embeddings, m):
     negatives = []
@@ -114,12 +119,12 @@ def triplet_negative_mining(anchor_embeddings, positive_embeddings, m):
             negatives.append(random.randint(0, len(anchor_embeddings) - 1))
     return negatives
 
-def pretraining(data, network, data_cutoff=None, update_count=6):
+def pretraining(data, network, data_cutoff=None, update_count=6, mining_method="Random", batch_size=4096):
     if data_cutoff is None:
         data_cutoff = len(data) - 1
 
     # BATCH_SIZE = 4096
-    BATCH_SIZE = 2048
+    BATCH_SIZE = batch_size
     samples = np.random.random_integers(0, data_cutoff, (BATCH_SIZE * update_count))
     total_loss = 0.0
     total_updates = 0
@@ -138,7 +143,12 @@ def pretraining(data, network, data_cutoff=None, update_count=6):
 
         anchor_embeddings = network.batch_out(anchors_expanded)
         positive_embeddings = network.batch_out(positives)
-        negatives_indices = triplet_negative_mining(anchor_embeddings, positive_embeddings, network.margin)
+        if mining_method == "Random":
+            negatives_indices = random_negative_mining([samples[i + j] for j in range(BATCH_SIZE)])
+        elif mining_method == "Semi-Hard":
+            negatives_indices = triplet_negative_mining(anchor_embeddings, positive_embeddings, network.margin)
+        else:
+            raise Exception("Invalid Mining Method Selected")
 
         negatives = np.array([anchors[j] for j in negatives_indices])
         negatives = np.expand_dims(negatives, axis=1)
@@ -150,7 +160,7 @@ def pretraining(data, network, data_cutoff=None, update_count=6):
     return total_loss, max(total_updates, 1)
 
 
-def self_supervised_training(output_dir, export_name, dataset, lr=3e-2, epochs=500, seed=None):
+def self_supervised_training(output_dir, export_name, dataset, lr=3e-2, epochs=500, seed=None, mining_method="Random", save=True, training_method="Scratch", only_features=False, embedding_size=5, batch_size=4096):
     if seed is not None:
         GLOBAL_SEED = seed
         np.random.seed(GLOBAL_SEED)
@@ -163,8 +173,11 @@ def self_supervised_training(output_dir, export_name, dataset, lr=3e-2, epochs=5
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logging.info(f"Training model on device: {device}")
 
-    network = NetworkWrapper(output_size=5, lr=lr, margin=1.0, weight_decay=1e-6, new_model=True,
-                             manual_schedulers=True, dynamic_lr=True, warmup=5)
+    base_network = None
+    if training_method == "ResNet":
+        base_network = ResNetEmbedding(embedding_size)
+
+    network = NetworkWrapper(output_size=embedding_size, lr=lr, margin=1.0, weight_decay=1e-6, new_model=True, manual_schedulers=True, dynamic_lr=True, warmup=5, network=base_network, only_features=only_features)
     sampled_dataset = SwarmDataset(dataset, rank=0)
 
     start_time = time.time()
@@ -173,7 +186,7 @@ def self_supervised_training(output_dir, export_name, dataset, lr=3e-2, epochs=5
     e = 0
     loss_history = []
     while e < TOTAL_EPOCHS:
-        total_loss, total_updates = pretraining(sampled_dataset, network, update_count=1)
+        total_loss, total_updates = pretraining(sampled_dataset, network, update_count=3, mining_method=mining_method, batch_size=batch_size)
         curr_loss = total_loss / total_updates
         loss_history.append(curr_loss)
         average_loss = (sum(loss_history[-3:]) / 3) if len(loss_history) > 3 else 50
@@ -187,4 +200,5 @@ def self_supervised_training(output_dir, export_name, dataset, lr=3e-2, epochs=5
     logging.info(f"Total Self-Supervised Training Time: {time.time() - start_time}")
 
     # Save Model
-    network.save(output_dir, export_name)
+    if save:
+        network.save(output_dir, export_name)

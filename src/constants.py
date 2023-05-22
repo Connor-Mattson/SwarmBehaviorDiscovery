@@ -21,6 +21,16 @@ STRATEGY_TYPES = frozenset([
     "Brown_et_al"
 ])
 
+MINING_TYPES = frozenset([
+    "Random",
+    "Semi-Hard"
+])
+
+NETWORK_TYPE = frozenset([
+    "Scratch",
+    "ResNet"
+])
+
 # Note: Not Immutable
 SINGLE_SENSOR_SET = SensorSet([
     BinaryLOSSensor(angle=0)
