@@ -23,9 +23,9 @@ from data.img_process import get_image_map, generate_world_config
 sample_size = 1000
 
 # Which portions of the program we should execute
-image_collection = True
+image_collection = False
 labeling = False
-stats = False
+stats = True
 
 
 def _generate_random_controllers(num=6, length=4):
@@ -154,9 +154,6 @@ if image_collection:
     pool.close()
     pool.join()
 
-    # for i, c in enumerate(controller_list):
-    #     _get_both_maps(c, i)
-
 # If the user has enabled labeling, loop over the stored controllers and allow the user to label them
 if labeling:
     df = pd.read_csv(csv_filepath, header=None)
@@ -207,8 +204,8 @@ if stats:
             coherent_light_values.append(mean_light_values[i])
 
     # Plotting the histogram
-    plt.hist(coherent_light_values, bins=range(160, 256, 7), color='green', alpha=0.5, label='Coherent')
-    plt.hist(entropic_light_values, bins=range(160, 256, 7), color='red', alpha=0.5, label='Entropic')
+    plt.hist(coherent_light_values, bins=range(0, 256, 3), color='green', alpha=0.5, label='Coherent')
+    plt.hist(entropic_light_values, bins=range(0, 256, 3), color='red', alpha=0.5, label='Entropic')
 
     # Chart settings
     plt.title('Average Brightness Histogram')

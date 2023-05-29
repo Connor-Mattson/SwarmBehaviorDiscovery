@@ -12,6 +12,8 @@ import math
 import random
 import pygame
 from collections import namedtuple
+from copy import copy
+import pygame_gui
 
 from novel_swarms.config.AgentConfig import DiffDriveAgentConfig
 from novel_swarms.config.AgentConfig import DroneAgentConfig
@@ -133,6 +135,19 @@ def _calculate_tile_clicked(mouse_pos):
     return pos_dict[tile_pos]
 
 
+def _detect_double_click(current_time, last_click_time):
+    """
+    Given the current time and the time of the previous click, return whether a double click
+    event has occurred.
+    :param current_time: The current time in milliseconds
+    :param last_click_time: The time of the last click in milliseconds
+    :return: Whether a double click event has occurred
+    """
+    if last_click_time is None:
+        return False
+    return current_time - last_click_time < 500
+
+
 def HIL_evolution_GUI(controllers, heterogeneous=False, generation=0):
     """
     Given a list of controllers, displays the corresponding behaviors on a layout of tiles.
@@ -152,7 +167,8 @@ def HIL_evolution_GUI(controllers, heterogeneous=False, generation=0):
     pygame.init()
 
     steps_per_frame = 5  # How many steps the worlds should take per frame
-    gui_width = 1500 + 200  # 200 extra pixels in width to show stats
+    sidebar_width = 200
+    gui_width = 1500 + sidebar_width  # 200 extra pixels in width to show stats
     gui_height = 1000
     tile_height = 500
     tile_width = 500
@@ -173,69 +189,93 @@ def HIL_evolution_GUI(controllers, heterogeneous=False, generation=0):
         (1000, 500)   # 5
     ]
 
+    manager = pygame_gui.UIManager((gui_width, gui_height))
+    skip_button = pygame_gui.elements.UIButton(
+        relative_rect=pygame.Rect(gui_width - sidebar_width + 5, 100, 60, 25),
+        text="Skip",
+        manager=manager,
+    )
+    advance_button = pygame_gui.elements.UIButton(
+        relative_rect=pygame.Rect(gui_width - sidebar_width + 5, 130, 85, 25),
+        text="Advance",
+        manager=manager
+    )
+    back_button = pygame_gui.elements.UIButton(
+        relative_rect=pygame.Rect(gui_width - sidebar_width + 5, 160, 60, 25),
+        text="Back",
+        manager=manager
+    )
+
     # The Pygame surfaces corresponding to each tile
     tiles = []
-    for _ in range(6):
+    tile_images = []
+    for i in range(6):
         tile = pygame.Surface((tile_width, tile_height))
+        tile_image = pygame_gui.elements.UIImage(
+            pygame.Rect(*tile_positions[i], tile_width, tile_height),
+            tile,
+            manager
+        )
+        tile_images.append(tile_image)
         tiles.append(tile)
 
     highlighted_indices = set()  # The indices corresponding to the tiles that have been clicked
     archived_controllers = list()  # The indices corresponding to the tiles that have been archived
 
+    clock = pygame.time.Clock()
+    last_click_time = None
     running = True
     while running:
+        time_delta = clock.tick(60) / 1000.0
+        current_time = pygame.time.get_ticks()
+
         # Handle if user tries to quit
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                running = False
-            # If the user clicks
-            elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-                tile_index = _calculate_tile_clicked(pygame.mouse.get_pos())  # Get the index of the clicked tile
-                # If the user clicked, but not on one of the tiles
-                if not tile_index:
-                    print("User has clicked out of bounds.")
-                # If the tile has already been clicked, unselect it
-                elif tile_index in highlighted_indices:
-                    highlighted_indices.remove(tile_index)
-                # If the tile has not been clicked, add it to the set of highlighted indices
+                return "stop"
+            elif event.type == pygame.MOUSEBUTTONUP and event.button == pygame.BUTTON_LEFT:
+                if _detect_double_click(current_time, last_click_time):
+                    for j, tile_image in enumerate(tile_images):
+                        if tile_image.rect.collidepoint(event.pos):
+                            archived_controllers.add(j)
                 else:
-                    highlighted_indices.add(tile_index)
-                # If more than two indices are selected, clear all selections
-                if len(highlighted_indices) > 2:
-                    highlighted_indices = set()
-            # If the user presses a key
-            elif event.type == pygame.KEYDOWN:
-                # If the user presses ENTER, stop the simulation
-                if event.key == pygame.K_RETURN:
-                    running = False
-                    # If the user has selected one or two tiles, return the fit controllers
-                    if len(highlighted_indices) in (1, 2):
-                        fit_controllers = [controllers[j] for j in highlighted_indices]
-                        pygame.quit()
-                        for c in archived_controllers:
-                            print(c)
-                        return fit_controllers
-                # If the user presses 's' while hovering over a tile, archive the corresponding controller
-                elif event.key == pygame.K_s:
-                    tile_index = _calculate_tile_clicked(pygame.mouse.get_pos())
-                    if tile_index is not None:
-                        archived_controller = controllers[tile_index]
-                        archived_controllers.append(archived_controller)
-                elif event.key == pygame.K_SPACE:
-                    return False
+                    for j, tile_image in enumerate(tile_images):
+                        if tile_image.rect.collidepoint(event.pos):
+                            if j in highlighted_indices:
+                                highlighted_indices.remove(j)
+                            else:
+                                highlighted_indices.add(j)
+                    if len(highlighted_indices) > 2:
+                        highlighted_indices = set()
+            # If the user clicks on a button
+            elif event.type == pygame.USEREVENT:
+                if event.type == pygame_gui.UI_BUTTON_PRESSED:
+                    # If the user doesn't find anything interesting, skip this round
+                    if event.ui_element == skip_button:
+                        return "skip"
+                    elif event.ui_element == advance_button:
+                        # If the user has selected one or two tiles, return the fit controllers
+                        if len(highlighted_indices) in (1, 2):
+                            fit_controllers = [controllers[j] for j in highlighted_indices]
+                            pygame.quit()
+                            for c in archived_controllers:
+                                print(c)
+                            return fit_controllers
+            manager.process_events(event)
 
         # Sidebar displays stats about the simulation
         parent_screen.fill((0, 0, 0))
+
         stats_surface = pygame.Surface((200, 1000))
         stats_surface.fill((0, 0, 0))
-        parent_screen.blit(stats_surface, (1500, 0))
-        text_x, text_y = 1500, 20
+        text_x, text_y = 0, 20
         font = pygame.font.Font(None, 25)
         text = font.render(f"Current generation: {generation}", True, (255, 255, 255))
-        parent_screen.blit(text, (text_x, text_y))
+        stats_surface.blit(text, (text_x, text_y))
         text_y += 30
         text = font.render(f"Timesteps: {timesteps}", True, (255, 255, 255))
-        parent_screen.blit(text, (text_x, text_y))
+        stats_surface.blit(text, (text_x, text_y))
+        parent_screen.blit(stats_surface, (1500, 0))
 
         timesteps += 1  # Increment the timer
 
@@ -247,15 +287,17 @@ def HIL_evolution_GUI(controllers, heterogeneous=False, generation=0):
             if timesteps % steps_per_frame == 0:
                 current_tile.fill((0, 0, 0))
                 tile_world.draw(current_tile)
-                parent_screen.blit(current_tile, tile_positions[i])
-                if i in highlighted_indices:
-                    parent_screen.blit(filter_surface, tile_positions[i])
-                rect_x, rect_y = tile_positions[i]
-                pygame.draw.rect(parent_screen, (255, 255, 255), (rect_x, rect_y, 450, 15))
-                truncated_controller = [round(n, 2) for n in controllers[i]]
+                pygame.draw.rect(current_tile, (255, 255, 255), (0, 0, 375, 15))
                 font = pygame.font.Font(None, 18)
+                truncated_controller = [round(n, 2) for n in controllers[i]]
                 text = font.render(f"Params: {truncated_controller}", True, (0, 0, 0))
-                parent_screen.blit(text, (rect_x, rect_y))
+                current_tile.blit(text, (0, 0))
+                if i in highlighted_indices:
+                    current_tile.blit(filter_surface, (0, 0))
+                tile_images[i].set_image(current_tile)
+
+        manager.update(0)
+        manager.draw_ui(parent_screen)
 
         # Flip the screen if we haven't done so in a while
         if timesteps % steps_per_frame == 0:
@@ -297,26 +339,34 @@ def _mutate_controller(controller):
     return mutated_controller
 
 
-# TODO: Change it so that one half of the controller inherits from one side and vice versa. Like chromosomes??
+def _crossover(index, c1, c2, rand_val):
+    """
+    Performs crossover on the given two controllers at the given index.
+    If rand_val > 0.5, then c1 is returned with a swap at `index`.
+    Otherwise, c2 is returned with a swap at `index`.
+    Does not mutate any of the parameters.
+    :return: A "crossed-over" version of one of the controllers
+    """
+    if rand_val > 0.5:
+        offspring = copy(c1)
+        offspring[index] = c2[index]
+        return offspring
+    else:
+        offspring = copy(c2)
+        offspring[index] = c1[index]
+        return offspring
+
+
 def _breed_controllers(c1, c2):
     """
-    Mutates and randomly combines the two given controllers
-
-    :param c1: Controller #1
-    :param c2: Controller #2
+    Mutates and randomly combines the two given controllers using crossover.
     :return: Offspring of the two controllers
     """
-    offspring = []
     # Mutate the controllers before combining
     c1 = _mutate_controller(c1)
     c2 = _mutate_controller(c2)
-    for k in range(len(c1)):
-        # Randomly combine elements in the controllers
-        if random.random() > 0.5:
-            offspring.append(c1[k])
-        else:
-            offspring.append(c2[k])
-    return offspring
+    crossover_index = math.floor(random.random() * len(c1))
+    return _crossover(crossover_index, c1, c2, random.random())
 
 
 def _get_new_generation(fit_controllers):
@@ -422,8 +472,10 @@ def HIL_evolution(number_of_generations):
 
     for generation in range(1, number_of_generations + 1):
         cycle_output = HIL_evolution_GUI(controllers, generation=0, heterogeneous=True)
-        if not cycle_output:
+        if cycle_output == "skip":
             controllers = _generate_random_controllers(length=9)
+        if cycle_output == "stop":
+            break
         else:
             fit_controllers = cycle_output
             controllers = _get_new_generation(fit_controllers)
