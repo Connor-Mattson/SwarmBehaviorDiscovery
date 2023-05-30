@@ -11,7 +11,7 @@ Author: Jeremy Clark
 import math
 import random
 import pygame
-from collections import namedtuple
+from collections import namedtuple, deque
 from copy import copy
 import pygame_gui
 
@@ -25,6 +25,7 @@ from novel_swarms.config.HeterogenSwarmConfig import HeterogeneousSwarmConfig
 from novel_swarms.config.WorldConfig import RectangularWorldConfig
 from novel_swarms.sensors.BinaryFOVSensor import BinaryFOVSensor
 from novel_swarms.sensors.BinaryLOSSensor import BinaryLOSSensor
+from novel_swarms.sensors.GenomeDependentSensor import GenomeFOVSensor
 from novel_swarms.sensors.SensorSet import SensorSet
 from novel_swarms.world.RectangularWorld import RectangularWorld
 
@@ -43,9 +44,10 @@ def _generate_heterogeneous_world_config(controller):
     p2 = pop - p1
     # Controllers of the two groups are embedded in the parent controller
     c1, c2 = controller[1:5], controller[5:9]
-    sensors = SensorSet([BinaryLOSSensor(angle=0)])
-    a1_config = DiffDriveAgentConfig(controller=c1, sensors=sensors, seed=None, body_color=(0, 255, 0))
-    a2_config = DiffDriveAgentConfig(controller=c2, sensors=sensors, seed=None, body_color=(255, 0, 0))
+    # sensors = SensorSet([BinaryLOSSensor(angle=0)])
+    sensors = SensorSet([BinaryFOVSensor(degrees=True, theta=15)])
+    a1_config = DiffDriveAgentConfig(controller=c1, sensors=sensors, seed=None, body_color=(200, 0, 0))
+    a2_config = DiffDriveAgentConfig(controller=c2, sensors=sensors, seed=None, body_color=(0, 200, 0))
     agent_config = HeterogeneousSwarmConfig()
     agent_config.add_sub_populuation(a1_config, p1)
     agent_config.add_sub_populuation(a2_config, p2)
@@ -148,6 +150,21 @@ def _detect_double_click(current_time, last_click_time):
     return current_time - last_click_time < 500
 
 
+def _truncate_controller(controller):
+    """
+    Truncate the decimals on the given controller so that it can be displayed
+    """
+    return [round(n, 2) for n in controller]
+
+
+def _step_tile_world(w):
+    """
+    Helper function for stepping worlds simultaneously.
+    """
+    w.step()
+    return w
+
+
 def HIL_evolution_GUI(controllers, heterogeneous=False, generation=0):
     """
     Given a list of controllers, displays the corresponding behaviors on a layout of tiles.
@@ -174,10 +191,6 @@ def HIL_evolution_GUI(controllers, heterogeneous=False, generation=0):
     tile_width = 500
     parent_screen = pygame.display.set_mode((gui_width, gui_height))
     pygame.display.set_caption("Swarm Chemistry HIL-assisted Evolution")
-
-    # A surface for highlighting the selected tiles. Filters with grey
-    filter_surface = pygame.Surface((tile_width, tile_height), pygame.SRCALPHA)
-    filter_surface.fill((255, 255, 255, 50))
 
     # The positions of the top left corners of the tiles
     tile_positions = [
@@ -232,12 +245,14 @@ def HIL_evolution_GUI(controllers, heterogeneous=False, generation=0):
         # Handle if user tries to quit
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
+                for c in archived_controllers:
+                    print(_truncate_controller(controllers[c]))
                 return "stop"
             elif event.type == pygame.MOUSEBUTTONUP and event.button == pygame.BUTTON_LEFT:
                 if _detect_double_click(current_time, last_click_time):
                     for j, tile_image in enumerate(tile_images):
                         if tile_image.rect.collidepoint(event.pos):
-                            archived_controllers.add(j)
+                            archived_controllers.append(j)
                 else:
                     for j, tile_image in enumerate(tile_images):
                         if tile_image.rect.collidepoint(event.pos):
@@ -247,11 +262,14 @@ def HIL_evolution_GUI(controllers, heterogeneous=False, generation=0):
                                 highlighted_indices.add(j)
                     if len(highlighted_indices) > 2:
                         highlighted_indices = set()
+                last_click_time = current_time
             # If the user clicks on a button
             elif event.type == pygame.USEREVENT:
-                if event.type == pygame_gui.UI_BUTTON_PRESSED:
+                if event.user_type == pygame_gui.UI_BUTTON_PRESSED:
                     # If the user doesn't find anything interesting, skip this round
                     if event.ui_element == skip_button:
+                        for c in archived_controllers:
+                            print(_truncate_controller(controllers[c]))
                         return "skip"
                     elif event.ui_element == advance_button:
                         # If the user has selected one or two tiles, return the fit controllers
@@ -259,8 +277,12 @@ def HIL_evolution_GUI(controllers, heterogeneous=False, generation=0):
                             fit_controllers = [controllers[j] for j in highlighted_indices]
                             pygame.quit()
                             for c in archived_controllers:
-                                print(c)
+                                print(_truncate_controller(controllers[c]))
                             return fit_controllers
+                    elif event.ui_element == back_button and generation != 1:
+                        for c in archived_controllers:
+                            print(_truncate_controller(controllers[c]))
+                        return "back"
             manager.process_events(event)
 
         # Sidebar displays stats about the simulation
@@ -289,14 +311,20 @@ def HIL_evolution_GUI(controllers, heterogeneous=False, generation=0):
                 tile_world.draw(current_tile)
                 pygame.draw.rect(current_tile, (255, 255, 255), (0, 0, 375, 15))
                 font = pygame.font.Font(None, 18)
-                truncated_controller = [round(n, 2) for n in controllers[i]]
+                truncated_controller = _truncate_controller(controllers[i])
                 text = font.render(f"Params: {truncated_controller}", True, (0, 0, 0))
                 current_tile.blit(text, (0, 0))
+                if i in archived_controllers:
+                    text = font.render("Save", True, (0, 0, 0))
+                    pygame.draw.rect(current_tile, (0, 150, 0), (tile_width - 35, 0, 35, 20))
+                    current_tile.blit(text, (tile_width - 30, 4))
                 if i in highlighted_indices:
-                    current_tile.blit(filter_surface, (0, 0))
+                    text = font.render("Evolve", True, (0, 0, 0))
+                    pygame.draw.rect(current_tile, (173, 216, 230), (tile_width - 70, 0, 35, 20))
+                    current_tile.blit(text, (tile_width - 70, 4))
                 tile_images[i].set_image(current_tile)
 
-        manager.update(0)
+        manager.update(time_delta)
         manager.draw_ui(parent_screen)
 
         # Flip the screen if we haven't done so in a while
@@ -306,7 +334,7 @@ def HIL_evolution_GUI(controllers, heterogeneous=False, generation=0):
     pygame.quit()
 
 
-def _generate_normal(std_dev=0.1):
+def _generate_normal(std_dev=0.2):
     """
     Generates a random number on a distribution curve centered at 0 and with a specified standard deviation.
 
@@ -330,11 +358,11 @@ def _mutate_controller(controller):
     :return: A mutated version of the parent
     """
     mutated_controller = []
-    for c in controller:
-        new_vel = c + _generate_normal()
+    for e in controller:
+        new_vel = e + _generate_normal()
         # Make sure the new velocity is between -1 and 1
         while not (-1 < new_vel < 1):
-            new_vel = c + _generate_normal()
+            new_vel = e + _generate_normal()
         mutated_controller.append(new_vel)
     return mutated_controller
 
@@ -462,24 +490,33 @@ def _selection_screen():
     return settings
 
 
-def HIL_evolution(number_of_generations):
+def HIL_evolution():
     """
     Driver function for Human in the Loop evolution.
-
-    :param number_of_generations: How many times to go through cycles of evolution
     """
     controllers = _generate_random_controllers(length=9)
+    history_stack = deque()
+    history_stack.append(controllers)
 
-    for generation in range(1, number_of_generations + 1):
-        cycle_output = HIL_evolution_GUI(controllers, generation=0, heterogeneous=True)
+    generation = 0
+    while True:
+        cycle_output = HIL_evolution_GUI(controllers, generation=generation, heterogeneous=False)
         if cycle_output == "skip":
             controllers = _generate_random_controllers(length=9)
-        if cycle_output == "stop":
-            break
+            generation += 1
+            history_stack.append(controllers)
+        elif cycle_output == "back":
+            controllers = history_stack.pop()
+            generation -= 1
+        elif cycle_output == "stop":
+            return
+        # The user pressed the advance button
         else:
             fit_controllers = cycle_output
             controllers = _get_new_generation(fit_controllers)
+            history_stack.append(controllers)
+            generation += 1
 
 
 if __name__ == '__main__':
-    HIL_evolution(10)
+    HIL_evolution()
