@@ -78,6 +78,7 @@ pyasn1-modules==0.2.8
 pycparser==2.21
 pygame==2.1.2
 pygame_gui==0.6.9
+pygame-widgets==1.1.1
 Pygments==2.13.0
 pyparsing==3.0.9
 pyrsistent==0.18.1
