@@ -9,7 +9,6 @@ import math
 import numpy as np
 from PIL import Image
 from scipy.ndimage import gaussian_filter
-import multiprocessing as mp
 
 from novel_swarms.config.AgentConfig import DiffDriveAgentConfig
 from novel_swarms.config.WorldConfig import RectangularWorldConfig
@@ -84,7 +83,7 @@ def _scan_kernel(point_map, kernel, dim, h, w):
     return np.sum(window)
 
 
-def _evaluate_density_map(world, steps=400, skip=10, stride=5, kernel_dim=100, sigma=20):
+def _evaluate_density_map(world, steps=2000, skip=10, stride=5, kernel_dim=100, sigma=20):
     """
     This is an alternative version of evaluate that outputs a density map of the agents over a specified
     number of steps. Skip specifies the frequency at which data should be collected.
@@ -205,7 +204,7 @@ def generate_world_config(controller):
     return config
 
 
-def get_image_map(controller, representation, filepath=None, frame_start=1200, world=None):
+def get_image_map(controller, representation, filepath=None, frame_start=1500, world=None):
     """
     Driver function for image representations. Gets the given type of representation for the given controller.
 
@@ -235,4 +234,8 @@ def get_image_map(controller, representation, filepath=None, frame_start=1200, w
 
 
 if __name__ == '__main__':
-    get_image_map([-0.7, -1.0, 1.0, -1.0], "trail")
+    get_image_map([-0.8979, -0.6356, 1.0000, -0.5669], "trail", filepath="/home/jeremy/Desktop/trail-map1.png")
+    get_image_map([-0.8442, -0.8507, -1.0000, 0.14202], "trail", filepath="/home/jeremy/Desktop/trail-map2.png")
+    get_image_map([-0.8979, -0.6356, 1.0000, -0.5669], "density", filepath="/home/jeremy/Desktop/density-map1.png")
+    get_image_map([-0.8442, -0.8507, -1.0000, 0.14202], "density", filepath="/home/jeremy/Desktop/density-map2.png")
+    print("Done")

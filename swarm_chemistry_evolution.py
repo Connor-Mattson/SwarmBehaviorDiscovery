@@ -1,4 +1,5 @@
 """
+REQUIRES PANDOC
 Implements the technique shown in Swarm Chemistry:
 https://direct.mit.edu/artl/article-abstract/15/1/105/2623/Swarm-Chemistry
 
@@ -13,7 +14,8 @@ import random
 import pygame
 from collections import namedtuple, deque
 from copy import copy
-from pygame_widgets.button import Button
+import subprocess
+import os
 
 from novel_swarms.config.AgentConfig import DiffDriveAgentConfig
 from novel_swarms.config.AgentConfig import DroneAgentConfig
@@ -27,6 +29,51 @@ from novel_swarms.sensors.BinaryFOVSensor import BinaryFOVSensor
 from novel_swarms.sensors.BinaryLOSSensor import BinaryLOSSensor
 from novel_swarms.sensors.SensorSet import SensorSet
 from novel_swarms.world.RectangularWorld import RectangularWorld
+
+
+class Button:
+    def __init__(self, text, dims, rel_pos, on_click, offset=(0, 0)):
+        self.bg_color = (150, 150, 150)
+        self.text = text
+        self.dims = dims
+        self.offset = offset
+        self.on_click = on_click
+        self.rel_pos = rel_pos
+
+    def get_abs_pos(self):
+        rel_x, rel_y = self.rel_pos
+        offset_x, offset_y = self.offset
+        abs_x = rel_x + offset_x
+        abs_y = rel_y + offset_y
+        result = (abs_x, abs_y)
+        return result
+
+    def mouse_is_above(self):
+        mouse_pos = pygame.mouse.get_pos()
+        mouse_x, mouse_y = mouse_pos
+        button_x, button_y = self.get_abs_pos()
+        width, height = self.dims
+        in_domain = 0 <= mouse_x - button_x <= width
+        in_range = 0 <= mouse_y - button_y <= height
+        return in_range and in_domain
+
+    def listen(self, events):
+        for event in events:
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if self.mouse_is_above():
+                    self.on_click()
+                    return True
+        return False
+
+    def draw(self, surface):
+        button_surface = pygame.Surface(self.dims)
+        button_surface.fill(self.bg_color)
+        pygame.font.init()
+        font = pygame.font.Font(None, size=20)
+        text = font.render(self.text, True, (0, 0, 0))
+        button_surface.blit(text, (0, 0))
+        pygame.font.quit()
+        surface.blit(button_surface, self.rel_pos)
 
 
 class GUIUtils:
@@ -45,8 +92,8 @@ class GUIUtils:
         p2 = pop - p1
         # Controllers of the two groups are embedded in the parent controller
         c1, c2 = controller[1:5], controller[5:9]
-        # sensors = SensorSet([BinaryLOSSensor(angle=0)])
-        sensors = SensorSet([BinaryFOVSensor(degrees=True, theta=15)])
+        sensors = SensorSet([BinaryLOSSensor(angle=0)])
+        # sensors = SensorSet([BinaryFOVSensor(degrees=True, theta=15)])
         a1_config = DiffDriveAgentConfig(controller=c1, sensors=sensors, seed=None, body_color=(200, 0, 0))
         a2_config = DiffDriveAgentConfig(controller=c2, sensors=sensors, seed=None, body_color=(0, 200, 0))
         agent_config = HeterogeneousSwarmConfig()
@@ -180,7 +227,6 @@ class GUIUtils:
                 new_generation.append(GUIUtils._mutate_controller(c))
         return new_generation
 
-
     @staticmethod
     def truncate_controller(controller):
         """
@@ -218,41 +264,29 @@ class HILGUI:
         ]
         return [GUITile(controller_list[i], i, absolute_positions_by_index[i], self) for i in range(8)]
 
-    def get_fit_controllers(self):
-        fit_controllers = []
+    def print_archived_controllers(self):
         for tile in self.tiles:
-            if tile.highlighted:
-                fit_controllers.append(tile.controller)
-        return fit_controllers
-
-    def get_archived_controllers(self):
-        archived_controllers = []
-        for tile in self.tiles:
-            if tile.highlighted:
+            if tile.archived:
                 truncated_controller = GUIUtils.truncate_controller(tile.controller)
-                archived_controllers.append(truncated_controller)
-        return archived_controllers
+                print(truncated_controller)
 
     def skip(self):
         self.running = False
         self.cycle_output = "Skip"
 
-    def quit(self):
-        self.running = False
-        self.cycle_output = "Quit"
-
     def back(self):
-        if self.generation > 1:
+        if self.generation > 0:
             self.running = False
             self.cycle_output = "Back"
 
     def advance(self):
-        fit_controllers = self.get_fit_controllers()
+        fit_controllers = self.fit_controllers
         if len(fit_controllers) in (1, 2):
             self.running = False
             self.cycle_output = fit_controllers
 
     def __init__(self, steps_per_frame=5):
+        pygame.init()
         self.steps_per_frame = steps_per_frame
         self.timesteps = 0
         self.generation = 0
@@ -263,79 +297,134 @@ class HILGUI:
         self.tile_width = 500
         self.tile_height = 500
         self.stats_surface = pygame.Surface((self.stats_width, self.height))
-
-        pygame.font.init()
-        self.skip_button = Button(self.stats_surface, 5, 100, 60, 25, text="Skip", radius=3, onClick=self.skip)
-        self.advance_button = Button(self.stats_surface, 5, 130, 85, 25, text="Advance", radius=3, onClick=self.advance)
-        self.back_button = Button(self.stats_surface, 5, 160, 60, 25, text="Back", radius=3, onClick=self.back)
-        pygame.font.quit()
-
+        offset = (self.width - self.stats_width, 0)
+        self.skip_button = Button("Skip", (60, 25), (5, 150), self.skip, offset=offset)
+        self.advance_button = Button("Advance", (60, 25), (5, 180), self.advance, offset=offset)
+        self.back_button = Button("Back", (60, 25), (5, 210), self.back, offset=offset)
         self.running = True
         self.cycle_output = None
-        controller_list = GUIUtils.generate_random_controllers()
-        self.tiles = self.get_tiles_from_controllers(controller_list)
+        self.tiles = None
         self.controller_history = deque()
-        self.controller_history.append(controller_list)
+        self.fit_controllers = []
 
     def draw(self):
         self.parent_screen.fill((0, 0, 0))
+        pygame.draw.rect(self.parent_screen, (255, 255, 255), (0, 0, 375, 15))
         for tile in self.tiles:
             tile.draw()
         self.stats_surface.fill((0, 0, 0))
         text_x, text_y = 0, 20
+        pygame.font.init()
         font = pygame.font.Font(None, 25)
         text = font.render(f"Current generation: {self.generation}", True, (255, 255, 255))
         self.stats_surface.blit(text, (text_x, text_y))
         text_y += 30
         text = font.render(f"Timesteps: {self.timesteps}", True, (255, 255, 255))
         self.stats_surface.blit(text, (text_x, text_y))
-        self.skip_button.draw()
-        self.advance_button.draw()
-        self.back_button.draw()
-        self.parent_screen.blit(self.stats_surface, (self.width - self.stats_width, self.height))
+        pygame.font.quit()
+
+        self.skip_button.draw(self.stats_surface)
+        self.advance_button.draw(self.stats_surface)
+        self.back_button.draw(self.stats_surface)
+        self.parent_screen.blit(self.stats_surface, (self.width - self.stats_width, 0))
+        pygame.display.flip()
 
     def step_all_worlds(self):
         for tile in self.tiles:
             tile.world.step()
 
     def one_cycle(self):
-        pygame.init()
+        current_controllers = self.controller_history[-1]
+        self.tiles = self.get_tiles_from_controllers(current_controllers)
         while self.running:
+            events = pygame.event.get()
+            for event in events:
+                if event.type == pygame.QUIT:
+                    self.cycle_output = "Quit"
+                    return
+            # Listen for button clicks
+            self.back_button.listen(events)
+            self.skip_button.listen(events)
+            self.advance_button.listen(events)
+            for tile in self.tiles:
+                tile.evolve_button.listen(events)
+                tile.save_button.listen(events)
+
             self.step_all_worlds()
             self.timesteps += 1
+            pygame.event.pump()  # Prevent force quit window from appearing
 
             # If it has been `steps_per_frame` timesteps since we last drew, update the screen
             if self.timesteps % self.steps_per_frame == 0:
                 self.draw()
-        pygame.quit()
+
         self.running = True
 
     def run(self):
         while True:
+            if len(self.controller_history) == 0:
+                random_controllers = GUIUtils.generate_random_controllers()
+                self.controller_history.append(random_controllers)
+            self.cycle_output = "_"
             self.one_cycle()
-            if self.cycle_output is list:
+            if type(self.cycle_output) == list:
                 controller_list = GUIUtils.get_new_generation(self.cycle_output)
                 self.controller_history.append(controller_list)
-                self.tiles = self.get_tiles_from_controllers(controller_list)
                 self.generation += 1
             elif self.cycle_output == "Quit":
-                for controller in self.get_archived_controllers():
-                    print(controller)
+                self.print_archived_controllers()
                 return
             elif self.cycle_output == "Skip":
+                self.print_archived_controllers()
                 controller_list = GUIUtils.generate_random_controllers()
                 self.controller_history.append(controller_list)
-                self.tiles = self.get_tiles_from_controllers(controller_list)
                 self.generation += 1
-            elif self.cycle_output == "Back":
-                controller_list = self.controller_history.pop()
-                self.tiles = self.get_tiles_from_controllers(controller_list)
+            elif self.cycle_output == "Back" and self.generation > 0:
+                self.print_archived_controllers()
+                self.controller_history.pop()
                 self.generation -= 1
             else:
                 raise ValueError(f"Received an improper flag from HILGUI.cycle_output. Got {self.cycle_output}.")
 
 
 class GUITile:
+
+    def get_tile_offset(self):
+        absolute_positions_by_index = [
+            (0, 0),
+            (500, 0),
+            (1000, 0),
+            (1500, 0),
+            (0, 500),
+            (500, 500),
+            (1000, 500),
+            (1500, 500)
+        ]
+        return absolute_positions_by_index[self.index]
+
+    def save_button_pressed(self):
+        if self.archived:
+            self.archived = False
+            self.save_button.bg_color = (150, 150, 150)
+        else:
+            self.archived = True
+            self.save_button.bg_color = (0, 150, 0)
+
+    def evolve_button_pressed(self):
+        if self.highlighted:
+            self.highlighted = False
+            self.gui.fit_controllers.remove(self.controller)
+            self.evolve_button.bg_color = (150, 150, 150)
+        else:
+            self.highlighted = True
+            self.gui.fit_controllers.append(self.controller)
+            self.evolve_button.bg_color = (0, 150, 0)
+            if len(self.gui.fit_controllers) > 2:
+                for tile in self.gui.tiles:
+                    tile.highlighted = False
+                    tile.evolve_button.bg_color = (150, 150, 150)
+                self.gui.fit_controllers = []
+
     def __init__(self, controller, index, abs_pos, gui):
         self.gui = gui
         self.controller = controller
@@ -343,16 +432,22 @@ class GUITile:
         self.abs_pos = abs_pos
         self.world = GUIUtils.generate_world(controller, heterogeneous=True)
         self.tile_surface = pygame.Surface((self.gui.tile_width, self.gui.tile_height))
-        pygame.font.init()
+        save_button_coords = (self.gui.tile_width - 70, self.gui.tile_height - 25)
+        evolve_button_coords = (self.gui.tile_width - 145, self.gui.tile_height - 25)
         self.evolve_button = Button(
-            self.tile_surface, 0, 0, 70, 25,
-            text="Evolve", radius=3, inactiveColour=(150, 150, 150)
+            "Evolve",
+            (70, 25),
+            evolve_button_coords,
+            self.evolve_button_pressed,
+            self.get_tile_offset()
         )
         self.save_button = Button(
-            self.tile_surface, 0, 0, 70, 25,
-            text="Save", radius=3, inactiveColour=(150, 150, 150)
+            "Save",
+            (70, 25),
+            save_button_coords,
+            self.save_button_pressed,
+            self.get_tile_offset()
         )
-        pygame.font.quit()
         self.highlighted = False
         self.archived = False
 
@@ -360,25 +455,20 @@ class GUITile:
         self.tile_surface.fill((0, 0, 0))
         self.world.draw(self.tile_surface)
         pygame.draw.rect(self.tile_surface, (255, 255, 255), (0, 0, 375, 15))
+        pygame.font.init()
         font = pygame.font.Font(None, 18)
         truncated_controller = GUIUtils.truncate_controller(self.controller)
         text = font.render(f"Params: {truncated_controller}", True, (0, 0, 0))
+        pygame.font.quit()
         self.tile_surface.blit(text, (0, 0))
-        if self.archived:
-            self.save_button.setInactiveColour((0, 150, 0))
-        if self.highlighted:
-            self.evolve_button.setInactiveColour((0, 150, 0))
-        self.save_button.draw()
-        self.evolve_button.draw()
-        self.gui.parent_screen.blit(self.tile_surface, self.abs_pos)
+        self.save_button.draw(self.tile_surface)
+        self.evolve_button.draw(self.tile_surface)
+
+        parent_screen = self.gui.parent_screen
+        parent_screen.blit(self.tile_surface, self.abs_pos)
 
 
-if __name__ == '__main__':
-    runner = HILGUI()
-    runner.run()
-
-
-def _selection_screen():
+def configuration_screen():
     """
     A screen that displays before the user does HIL-assisted evolution.
     It allows them to change the settings, such as the capability model used, the type of sensors, etc.
@@ -444,3 +534,31 @@ def _selection_screen():
     return settings
 
 
+def _update_manual_pdf(md_file_path, pdf_file_path):
+    try:
+        subprocess.run(['pandoc', md_file_path, '-o', pdf_file_path])
+    except OSError:
+        print("Pandoc not found. Please make sure Pandoc is installed.")
+
+
+def _detect_manual_closure(process):
+    process.wait()
+    if process.poll() is not None:
+        print("The manual has been closed.")
+
+
+def display_manual():
+    update_manual_pdf = True
+    md_file_path = os.path.join(os.getcwd(), "HIL-GUI-manual.md")
+    pdf_file_path = os.path.join(os.getcwd(), "HIL-GUI-manual.pdf")
+    subprocess.call(['touch', pdf_file_path])
+    if update_manual_pdf:
+        _update_manual_pdf(md_file_path, pdf_file_path)
+        if not os.path.exists(pdf_file_path):
+            raise FileNotFoundError(f"The following filepath does not exist: {pdf_file_path}")
+    pdf_viewer_process = subprocess.Popen['xdg-open', pdf_file_path]
+    _detect_manual_closure(pdf_viewer_process)
+
+
+if __name__ == '__main__':
+    display_manual()
