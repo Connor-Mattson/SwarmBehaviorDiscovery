@@ -15,7 +15,7 @@ import pygame
 from collections import namedtuple, deque
 from copy import copy
 import subprocess
-import os
+import time
 
 from novel_swarms.config.AgentConfig import DiffDriveAgentConfig
 from novel_swarms.config.AgentConfig import DroneAgentConfig
@@ -232,17 +232,17 @@ class GUIUtils:
         """
         Truncate the decimals on the given controller so that it can be displayed
         """
-        return [round(n, 3) for n in controller]
+        return [round(n, 2) for n in controller]
 
     @staticmethod
     def generate_random_controllers(num=8, length=9):
         """
-            Generates `num` random controllers of length `length`
+        Generates `num` random controllers of length `length`
 
-            :param num: The number of controllers to generate
-            :param length: The length of each controller
-            :return: A list of randomly generated controllers
-            """
+        :param num: The number of controllers to generate
+        :param length: The length of each controller
+        :return: A list of randomly generated controllers
+        """
         controller_list = []
         for _ in range(num):
             controller = [random.uniform(-1, 1) for _ in range(length)]
@@ -262,7 +262,11 @@ class HILGUI:
             (1000, 500),
             (1500, 500)
         ]
-        return [GUITile(controller_list[i], i, absolute_positions_by_index[i], self) for i in range(8)]
+        tiles = [
+            GUITile(controller_list[i], i, absolute_positions_by_index[i], self)
+            for i in range(8)
+        ]
+        return tiles
 
     def print_archived_controllers(self):
         for tile in self.tiles:
@@ -285,7 +289,7 @@ class HILGUI:
             self.running = False
             self.cycle_output = fit_controllers
 
-    def __init__(self, steps_per_frame=5):
+    def __init__(self, heterogeneous=False, steps_per_frame=5, time_limit=None):
         pygame.init()
         self.steps_per_frame = steps_per_frame
         self.timesteps = 0
@@ -306,20 +310,37 @@ class HILGUI:
         self.tiles = None
         self.controller_history = deque()
         self.fit_controllers = []
+        self.heterogeneous = heterogeneous
+        self.start_time = None
+        self.time_limit = time_limit
+        self.number_of_clicks = 0
+
+    def get_time_string(self):
+        current_time = time.time()
+        seconds = current_time - self.start_time
+        hours, remainder = divmod(seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        return f"{int(hours)}:{int(minutes)}:{int(seconds)}"
 
     def draw(self):
         self.parent_screen.fill((0, 0, 0))
-        pygame.draw.rect(self.parent_screen, (255, 255, 255), (0, 0, 375, 15))
         for tile in self.tiles:
             tile.draw()
         self.stats_surface.fill((0, 0, 0))
         text_x, text_y = 0, 20
         pygame.font.init()
         font = pygame.font.Font(None, 25)
-        text = font.render(f"Current generation: {self.generation}", True, (255, 255, 255))
+        white_color = (255, 255, 255)
+        text = font.render(f"Current generation: {self.generation}", True, white_color)
         self.stats_surface.blit(text, (text_x, text_y))
         text_y += 30
-        text = font.render(f"Timesteps: {self.timesteps}", True, (255, 255, 255))
+        text = font.render(f"Timesteps: {self.timesteps}", True, white_color)
+        self.stats_surface.blit(text, (text_x, text_y))
+        text_y += 30
+        text = font.render(self.get_time_string(), True, white_color)
+        self.stats_surface.blit(text, (text_x, text_y))
+        text_y += 30
+        text = font.render(f"Number of clicks: {self.number_of_clicks}", True, white_color)
         self.stats_surface.blit(text, (text_x, text_y))
         pygame.font.quit()
 
@@ -358,9 +379,12 @@ class HILGUI:
             if self.timesteps % self.steps_per_frame == 0:
                 self.draw()
 
+        self.number_of_clicks += 1
+        self.timesteps = 0
         self.running = True
 
     def run(self):
+        self.start_time = time.time()
         while True:
             if len(self.controller_history) == 0:
                 random_controllers = GUIUtils.generate_random_controllers()
@@ -425,12 +449,12 @@ class GUITile:
                     tile.evolve_button.bg_color = (150, 150, 150)
                 self.gui.fit_controllers = []
 
-    def __init__(self, controller, index, abs_pos, gui):
-        self.gui = gui
+    def __init__(self, controller, index, abs_pos, parent_gui):
+        self.gui = parent_gui
         self.controller = controller
         self.index = index
         self.abs_pos = abs_pos
-        self.world = GUIUtils.generate_world(controller, heterogeneous=True)
+        self.world = GUIUtils.generate_world(controller, heterogeneous=parent_gui.heterogeneous)
         self.tile_surface = pygame.Surface((self.gui.tile_width, self.gui.tile_height))
         save_button_coords = (self.gui.tile_width - 70, self.gui.tile_height - 25)
         evolve_button_coords = (self.gui.tile_width - 145, self.gui.tile_height - 25)
@@ -454,7 +478,7 @@ class GUITile:
     def draw(self):
         self.tile_surface.fill((0, 0, 0))
         self.world.draw(self.tile_surface)
-        pygame.draw.rect(self.tile_surface, (255, 255, 255), (0, 0, 375, 15))
+        pygame.draw.rect(self.tile_surface, (255, 255, 255), (0, 0, self.gui.tile_width-50, 15))
         pygame.font.init()
         font = pygame.font.Font(None, 18)
         truncated_controller = GUIUtils.truncate_controller(self.controller)
@@ -534,31 +558,15 @@ def configuration_screen():
     return settings
 
 
-def _update_manual_pdf(md_file_path, pdf_file_path):
+def _update_manual_pdf():
+    md_file_path = "HIL-GUI-manual.md"
+    pdf_file_path = "HIL-GUI-manual.pdf"
     try:
         subprocess.run(['pandoc', md_file_path, '-o', pdf_file_path])
     except OSError:
-        print("Pandoc not found. Please make sure Pandoc is installed.")
-
-
-def _detect_manual_closure(process):
-    process.wait()
-    if process.poll() is not None:
-        print("The manual has been closed.")
-
-
-def display_manual():
-    update_manual_pdf = True
-    md_file_path = os.path.join(os.getcwd(), "HIL-GUI-manual.md")
-    pdf_file_path = os.path.join(os.getcwd(), "HIL-GUI-manual.pdf")
-    subprocess.call(['touch', pdf_file_path])
-    if update_manual_pdf:
-        _update_manual_pdf(md_file_path, pdf_file_path)
-        if not os.path.exists(pdf_file_path):
-            raise FileNotFoundError(f"The following filepath does not exist: {pdf_file_path}")
-    pdf_viewer_process = subprocess.Popen['xdg-open', pdf_file_path]
-    _detect_manual_closure(pdf_viewer_process)
+        print(f"{md_file_path} does not exist.")
 
 
 if __name__ == '__main__':
-    display_manual()
+    gui = HILGUI()
+    gui.run()

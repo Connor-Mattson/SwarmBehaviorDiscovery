@@ -9,6 +9,10 @@ import math
 import numpy as np
 from PIL import Image
 from scipy.ndimage import gaussian_filter
+import pygame
+import imageio
+import tempfile
+import os
 
 from novel_swarms.config.AgentConfig import DiffDriveAgentConfig
 from novel_swarms.config.WorldConfig import RectangularWorldConfig
@@ -204,7 +208,32 @@ def generate_world_config(controller):
     return config
 
 
-def get_image_map(controller, representation, filepath=None, frame_start=1500, world=None):
+def _get_gif_representation(world, filepath, steps=500, skip=5):
+    pygame.init()
+    screen = pygame.display.set_mode((500, 500), flags=pygame.HIDDEN)
+    temp_dir = tempfile.TemporaryDirectory()
+    for i in range(steps):
+        world.step()
+        screen.fill((0, 0, 0))
+        if i % skip == 0:
+            world.draw(screen)
+            pygame.display.flip()
+            frame_number = i // skip
+            frame = pygame.surfarray.array3d(screen)
+            img = Image.fromarray(frame.astype('uint8'), 'RGB')
+            temp_path = os.path.join(temp_dir.name, f"frame-{frame_number}.jpg")
+            img.save(temp_path)
+
+    number_of_frames = steps // skip
+    frames = []
+    for i in range(number_of_frames):
+        img = imageio.v2.imread(os.path.join(temp_dir.name, f"frame-{i}.jpg"))
+        frames.append(img)
+    imageio.mimsave(filepath, frames, duration=100, loop=0)
+    temp_dir.cleanup()
+
+
+def get_image_map(controller, representation, filepath=None, frame_start=1200, world=None):
     """
     Driver function for image representations. Gets the given type of representation for the given controller.
 
@@ -216,14 +245,21 @@ def get_image_map(controller, representation, filepath=None, frame_start=1500, w
     """
     func_dict = {
         "density": _evaluate_density_map,
-        "trail": _evaluate_trails
+        "trail": _evaluate_trails,
+        "gif": None
     }
     analyzer = func_dict[representation]
+
     if world is None:
         config = generate_world_config(controller)
         world = RectangularWorld(config)
         for _ in range(frame_start):
             world.step()
+
+    if representation == "gif":
+        _get_gif_representation(world, filepath)
+        return
+
     output = analyzer(world)
     img = Image.fromarray(output.astype('uint8'), 'L')
     if filepath is None:
@@ -234,8 +270,5 @@ def get_image_map(controller, representation, filepath=None, frame_start=1500, w
 
 
 if __name__ == '__main__':
-    get_image_map([-0.8979, -0.6356, 1.0000, -0.5669], "trail", filepath="/home/jeremy/Desktop/trail-map1.png")
-    get_image_map([-0.8442, -0.8507, -1.0000, 0.14202], "trail", filepath="/home/jeremy/Desktop/trail-map2.png")
-    get_image_map([-0.8979, -0.6356, 1.0000, -0.5669], "density", filepath="/home/jeremy/Desktop/density-map1.png")
-    get_image_map([-0.8442, -0.8507, -1.0000, 0.14202], "density", filepath="/home/jeremy/Desktop/density-map2.png")
+    get_image_map([-0.8979, -0.6356, 1.0000, -0.5669], "gif", filepath="/home/jeremy/Desktop/example.gif")
     print("Done")

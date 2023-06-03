@@ -10,6 +10,8 @@ Author: Jeremy Clark
 
 import random
 import multiprocessing as mp
+
+import imageio.v2
 import pygame
 import pandas as pd
 from PIL import Image
@@ -20,12 +22,12 @@ from novel_swarms.world.RectangularWorld import RectangularWorld
 from data.img_process import get_image_map, generate_world_config
 
 # How many images should we collect for training
-sample_size = 1000
+sample_size = 10
 
 # Which portions of the program we should execute
 image_collection = False
-labeling = False
-stats = True
+labeling = True
+stats = False
 
 
 def _generate_random_controllers(num=6, length=4):
@@ -71,8 +73,10 @@ def _get_both_maps(control, index):
     # Save the density-map and trail-map in their appropriate locations
     trail_path = f"../../data/trail-maps/controller-{index}.jpg"
     density_path = f"../../data/density-maps/controller-{index}.jpg"
+    gif_path = f"../../data/swarm-gifs/controller-{index}.gif"
     get_image_map(control, "trail", filepath=trail_path, world=world)
     get_image_map(control, "density", filepath=density_path, world=world)
+    get_image_map(control, "gif", filepath=gif_path, world=world)
 
 
 def label_controller(index):
@@ -87,16 +91,21 @@ def label_controller(index):
     """
     trail_path = f"../../data/trail-maps/controller-{index}.jpg"
     density_path = f"../../data/density-maps/controller-{index}.jpg"
+    gif_path = f"../../data/swarm-gifs/controller-{index}.gif"
     trail_map_image = None
     density_map_image = None
-    # Try to get the images if they exist. If they don't return early
+    swarm_gif = None
+    # Try to get the images if they exist. If they don't, return early
     try:
         trail_map_image = pygame.image.load(trail_path)
         density_map_image = pygame.image.load(density_path)
+        swarm_gif = Image.open(gif_path)
     except FileNotFoundError:
-        return "File not found"
+        print("File not found")
+        return
 
     # Start pygame
+    swarm_gif.show()
     pygame.init()
     screen = pygame.display.set_mode((620, 500))
 
@@ -120,8 +129,8 @@ def label_controller(index):
                     running = False
 
         screen.fill((0, 0, 0))  # Fill with black
-        screen.blit(trail_map_image, (0, 0))  # Put the image on the screen
         screen.blit(density_map_image, (500, 70))
+        screen.blit(trail_map_image, (0, 0))
 
         # Provide a reference to the user
         text = font.render("0 = entropic", True, (200, 200, 200))
@@ -133,8 +142,9 @@ def label_controller(index):
 
         # Refresh the screen and wait for 1/5 of a second
         pygame.display.flip()
-        pygame.time.delay(200)
+        pygame.time.delay(10)
 
+    swarm_gif.close()
     return coherent
 
 
@@ -163,10 +173,8 @@ if labeling:
 
         label = label_controller(i)
         # Handle cases where the file doesn't exist
-        if not label == "File not found":
+        if label is not None:
             df.loc[i, 0] = label
-        else:
-            print(f"Faulty index: {i}")
 
     df.to_csv(csv_filepath, index=False, header=False)
 
