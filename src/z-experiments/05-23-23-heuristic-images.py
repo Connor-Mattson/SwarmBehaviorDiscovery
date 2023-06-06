@@ -7,16 +7,18 @@ If that doesn't work, we'll try training a CNN model instead.
 
 Author: Jeremy Clark
 """
-
+import copy
+import os.path
 import random
 import multiprocessing as mp
 
-import imageio.v2
 import pygame
 import pandas as pd
 from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
+import subprocess
+from src.ui.button import Button
 
 from novel_swarms.world.RectangularWorld import RectangularWorld
 from data.img_process import get_image_map, generate_world_config
@@ -68,15 +70,15 @@ def _get_both_maps(control, index):
     # Create a shared world and step through 1500 times
     config = generate_world_config(control)
     world = RectangularWorld(config)
-    for _ in range(1500):
+    for _ in range(1200):
         world.step()
     # Save the density-map and trail-map in their appropriate locations
     trail_path = f"../../data/trail-maps/controller-{index}.jpg"
     density_path = f"../../data/density-maps/controller-{index}.jpg"
     gif_path = f"../../data/swarm-gifs/controller-{index}.gif"
-    get_image_map(control, "trail", filepath=trail_path, world=world)
-    get_image_map(control, "density", filepath=density_path, world=world)
-    get_image_map(control, "gif", filepath=gif_path, world=world)
+    get_image_map(control, "trail", filepath=trail_path, world=copy.deepcopy(world))
+    get_image_map(control, "density", filepath=density_path, world=copy.deepcopy(world))
+    get_image_map(control, "gif", filepath=gif_path, world=copy.deepcopy(world))
 
 
 def label_controller(index):
@@ -91,60 +93,64 @@ def label_controller(index):
     """
     trail_path = f"../../data/trail-maps/controller-{index}.jpg"
     density_path = f"../../data/density-maps/controller-{index}.jpg"
-    gif_path = f"../../data/swarm-gifs/controller-{index}.gif"
+    gif_path = os.path.abspath(f"../../data/swarm-gifs/controller-{index}.gif")
     trail_map_image = None
     density_map_image = None
-    swarm_gif = None
     # Try to get the images if they exist. If they don't, return early
     try:
         trail_map_image = pygame.image.load(trail_path)
         density_map_image = pygame.image.load(density_path)
-        swarm_gif = Image.open(gif_path)
     except FileNotFoundError:
         print("File not found")
         return
 
     # Start pygame
-    swarm_gif.show()
-    pygame.init()
-    screen = pygame.display.set_mode((620, 500))
-
-    coherent = None  # We don't know whether the behavior is coherent
-    font = pygame.font.Font(None, 25)
-
     running = True
+    coherent = None  # We don't know whether the behavior is coherent
+    screen = pygame.display.set_mode((620, 500))
+    subprocess.run(["xdg-open", gif_path])
+
+    def coherent_button_clicked():
+        nonlocal coherent
+        coherent = True
+        nonlocal running
+        running = False
+
+    def entropic_button_clicked():
+        nonlocal coherent
+        coherent = False
+        nonlocal running
+        running = False
+
+    coherent_button = Button("Coherent", (70, 25), (500+5, 300), on_click=coherent_button_clicked)
+    entropic_button = Button("Entropic", (70, 25), (500+5, 350), on_click=entropic_button_clicked)
+
     while running:
-        for event in pygame.event.get():
+        events = pygame.event.get()
+        for event in events:
             # If the user tries to close the window, quit
             if event.type == pygame.QUIT:
                 running = False
-            elif event.type == pygame.KEYDOWN:
-                # If the user presses 0, stop running and label this index as entropic
-                if event.key == pygame.K_0:
-                    coherent = 0
-                    running = False
-                # If the user presses 1, stop running and label this index as coherent
-                elif event.key == pygame.K_1:
-                    coherent = 1
-                    running = False
+        coherent_button.listen(events)
+        entropic_button.listen(events)
 
         screen.fill((0, 0, 0))  # Fill with black
         screen.blit(density_map_image, (500, 70))
         screen.blit(trail_map_image, (0, 0))
 
         # Provide a reference to the user
-        text = font.render("0 = entropic", True, (200, 200, 200))
-        screen.blit(text, (505, 5))
-        text = font.render("1 = coherent", True, (200, 200, 200))
-        screen.blit(text, (505, 30))
+        pygame.font.init()
+        font = pygame.font.Font(None, 25)
         text = font.render(f"index = {index}", True, (200, 200, 200))
+        pygame.font.quit()
         screen.blit(text, (505, 475))
+        coherent_button.draw(screen)
+        entropic_button.draw(screen)
 
         # Refresh the screen and wait for 1/5 of a second
         pygame.display.flip()
-        pygame.time.delay(10)
 
-    swarm_gif.close()
+    subprocess.run(['pkill', 'eog'])
     return coherent
 
 
@@ -166,6 +172,7 @@ if image_collection:
 
 # If the user has enabled labeling, loop over the stored controllers and allow the user to label them
 if labeling:
+    pygame.init()
     df = pd.read_csv(csv_filepath, header=None)
     for i in range(len(controller_list)):
         if (i+1) % 50 == 0:
@@ -176,6 +183,7 @@ if labeling:
         if label is not None:
             df.loc[i, 0] = label
 
+    pygame.quit()
     df.to_csv(csv_filepath, index=False, header=False)
 
 if stats:

@@ -120,3 +120,5 @@ widgetsnbextension==4.0.3
 pandoc==2.3
 pypandoc~=1.11
 imageio~=2.30.0
+pyglet~=2.0.7
+PyYAML~=6.0

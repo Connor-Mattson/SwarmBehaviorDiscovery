@@ -208,8 +208,11 @@ def generate_world_config(controller):
     return config
 
 
-def _get_gif_representation(world, filepath, steps=500, skip=5):
-    pygame.init()
+def get_gif_representation(world, filepath, steps=500, skip=5):
+    """
+    Given a world and a filepath, saves the world as a GIF over `steps` timesteps
+    in the filepath. `skip` specifies the number of steps between data collection.
+    """
     screen = pygame.display.set_mode((500, 500), flags=pygame.HIDDEN)
     temp_dir = tempfile.TemporaryDirectory()
     for i in range(steps):
@@ -243,11 +246,13 @@ def get_image_map(controller, representation, filepath=None, frame_start=1200, w
     :param frame_start: Where to start recording data if a world is not provided.
     :param world: The given world. If None, generate it from scratch.
     """
+    # Dictionary the maps the given `representation` to the appropriate function
     func_dict = {
         "density": _evaluate_density_map,
         "trail": _evaluate_trails,
         "gif": None
     }
+    # The function used to analyze the image
     analyzer = func_dict[representation]
 
     if world is None:
@@ -257,7 +262,7 @@ def get_image_map(controller, representation, filepath=None, frame_start=1200, w
             world.step()
 
     if representation == "gif":
-        _get_gif_representation(world, filepath)
+        get_gif_representation(world, filepath)
         return
 
     output = analyzer(world)

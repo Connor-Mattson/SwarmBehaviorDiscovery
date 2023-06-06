@@ -1,5 +1,4 @@
 """
-REQUIRES PANDOC
 Implements the technique shown in Swarm Chemistry:
 https://direct.mit.edu/artl/article-abstract/15/1/105/2623/Swarm-Chemistry
 
@@ -10,13 +9,20 @@ In this case, the human acts as the fitness function, searching for novel/intere
 Author: Jeremy Clark
 """
 import math
+import os.path
 import random
+
+import pandas as pd
 import pygame
 from collections import namedtuple, deque
-from copy import copy
+from copy import copy, deepcopy
 import subprocess
 import time
+import psutil
+import csv
 
+from src.ui.button import Button
+from data.img_process import get_gif_representation
 from novel_swarms.config.AgentConfig import DiffDriveAgentConfig
 from novel_swarms.config.AgentConfig import DroneAgentConfig
 from novel_swarms.config.AgentConfig import UnicycleAgentConfig
@@ -31,54 +37,9 @@ from novel_swarms.sensors.SensorSet import SensorSet
 from novel_swarms.world.RectangularWorld import RectangularWorld
 
 
-class Button:
-    def __init__(self, text, dims, rel_pos, on_click, offset=(0, 0)):
-        self.bg_color = (150, 150, 150)
-        self.text = text
-        self.dims = dims
-        self.offset = offset
-        self.on_click = on_click
-        self.rel_pos = rel_pos
-
-    def get_abs_pos(self):
-        rel_x, rel_y = self.rel_pos
-        offset_x, offset_y = self.offset
-        abs_x = rel_x + offset_x
-        abs_y = rel_y + offset_y
-        result = (abs_x, abs_y)
-        return result
-
-    def mouse_is_above(self):
-        mouse_pos = pygame.mouse.get_pos()
-        mouse_x, mouse_y = mouse_pos
-        button_x, button_y = self.get_abs_pos()
-        width, height = self.dims
-        in_domain = 0 <= mouse_x - button_x <= width
-        in_range = 0 <= mouse_y - button_y <= height
-        return in_range and in_domain
-
-    def listen(self, events):
-        for event in events:
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if self.mouse_is_above():
-                    self.on_click()
-                    return True
-        return False
-
-    def draw(self, surface):
-        button_surface = pygame.Surface(self.dims)
-        button_surface.fill(self.bg_color)
-        pygame.font.init()
-        font = pygame.font.Font(None, size=20)
-        text = font.render(self.text, True, (0, 0, 0))
-        button_surface.blit(text, (0, 0))
-        pygame.font.quit()
-        surface.blit(button_surface, self.rel_pos)
-
-
 class GUIUtils:
     @staticmethod
-    def _generate_heterogeneous_world_config(controller):
+    def generate_heterogeneous_world_config(controller):
         """
         Helper function for _generate_world_config
 
@@ -121,7 +82,7 @@ class GUIUtils:
         :return: A world config
         """
         if heterogeneous:
-            return RectangularWorld(GUIUtils._generate_heterogeneous_world_config(controller))
+            return RectangularWorld(GUIUtils.generate_heterogeneous_world_config(controller))
         sensors = SensorSet([BinaryLOSSensor(angle=0)])
         agent_config = DiffDriveAgentConfig(
             controller=controller,
@@ -218,13 +179,18 @@ class GUIUtils:
         # If the user has selected two controllers
         if len(fit_controllers) == 2:
             c1, c2 = fit_controllers
-            for _ in range(8):
+            for _ in range(5):
                 new_generation.append(GUIUtils._breed_controllers(c1, c2))
+            new_generation.append(c1)
+            new_generation.append(c2)
+            new_generation.append(GUIUtils.generate_random_controllers(1, len(c1))[0])
         # Otherwise, the length of fit_controllers must be 1
         else:
             c = fit_controllers[0]
-            for _ in range(8):
+            for _ in range(6):
                 new_generation.append(GUIUtils._mutate_controller(c))
+            new_generation.append(c)
+            new_generation.append(GUIUtils.generate_random_controllers(1, len(c))[0])
         return new_generation
 
     @staticmethod
@@ -246,11 +212,52 @@ class GUIUtils:
         controller_list = []
         for _ in range(num):
             controller = [random.uniform(-1, 1) for _ in range(length)]
-            controller_list.append(controller)
+            magnitudes = [abs(x) for x in controller]
+            scaling_factor = 1 / max(magnitudes)
+            normalized_controller = [scaling_factor * x for x in controller]
+            controller_list.append(normalized_controller)
         return controller_list
 
 
 class HILGUI:
+    def __init__(
+            self,
+            heterogeneous=False,
+            steps_per_frame=5,
+            time_limit=None,
+            click_limit=None,
+            save_archived_controllers=False,
+    ):
+        pygame.init()
+        self.steps_per_frame = steps_per_frame
+        self.timesteps = 0
+        self.generation = 0
+        self.stats_width = 200
+        self.width = 2000 + self.stats_width
+        self.height = 1000
+        self.parent_screen = pygame.display.set_mode((self.width, self.height))
+        self.tile_width = 500
+        self.tile_height = 500
+        self.stats_surface = pygame.Surface((self.stats_width, self.height))
+        offset = (self.width - self.stats_width, 0)
+        self.skip_button = Button("Skip", (60, 25), (5, 150), self.skip, offset=offset)
+        self.advance_button = Button("Advance", (60, 25), (5, 180), self.advance, offset=offset)
+        self.back_button = Button("Back", (60, 25), (5, 210), self.back, offset=offset)
+        self.running = True
+        self.cycle_output = None
+        self.tiles = None
+        self.controller_history = deque()
+        self.fit_controllers = []
+        self.heterogeneous = heterogeneous
+        self.start_time = None
+        self.time_limit = time_limit
+        self.click_limit = None
+        self.number_of_clicks = 0
+        self.save_archived_controllers = save_archived_controllers
+        self.click_limit = click_limit
+        self.cpu_threshold = 50
+        self.archived_controllers = []
+
     def get_tiles_from_controllers(self, controller_list):
         absolute_positions_by_index = [
             (0, 0),
@@ -288,32 +295,6 @@ class HILGUI:
         if len(fit_controllers) in (1, 2):
             self.running = False
             self.cycle_output = fit_controllers
-
-    def __init__(self, heterogeneous=False, steps_per_frame=5, time_limit=None):
-        pygame.init()
-        self.steps_per_frame = steps_per_frame
-        self.timesteps = 0
-        self.generation = 0
-        self.stats_width = 200
-        self.width = 2000 + self.stats_width
-        self.height = 1000
-        self.parent_screen = pygame.display.set_mode((self.width, self.height))
-        self.tile_width = 500
-        self.tile_height = 500
-        self.stats_surface = pygame.Surface((self.stats_width, self.height))
-        offset = (self.width - self.stats_width, 0)
-        self.skip_button = Button("Skip", (60, 25), (5, 150), self.skip, offset=offset)
-        self.advance_button = Button("Advance", (60, 25), (5, 180), self.advance, offset=offset)
-        self.back_button = Button("Back", (60, 25), (5, 210), self.back, offset=offset)
-        self.running = True
-        self.cycle_output = None
-        self.tiles = None
-        self.controller_history = deque()
-        self.fit_controllers = []
-        self.heterogeneous = heterogeneous
-        self.start_time = None
-        self.time_limit = time_limit
-        self.number_of_clicks = 0
 
     def get_time_string(self):
         current_time = time.time()
@@ -357,6 +338,7 @@ class HILGUI:
     def one_cycle(self):
         current_controllers = self.controller_history[-1]
         self.tiles = self.get_tiles_from_controllers(current_controllers)
+        psutil.cpu_percent(interval=None, percpu=True)
         while self.running:
             events = pygame.event.get()
             for event in events:
@@ -386,6 +368,12 @@ class HILGUI:
     def run(self):
         self.start_time = time.time()
         while True:
+            if self.click_limit is not None and self.number_of_clicks >= self.click_limit:
+                print(f"Click limit of {self.click_limit} clicks reached.")
+                return
+            elapsed_time = self.get_time_string()
+            if self.time_limit is not None and elapsed_time >= self.time_limit:
+                print(f"Time limit of {elapsed_time} reached.")
             if len(self.controller_history) == 0:
                 random_controllers = GUIUtils.generate_random_controllers()
                 self.controller_history.append(random_controllers)
@@ -397,7 +385,7 @@ class HILGUI:
                 self.generation += 1
             elif self.cycle_output == "Quit":
                 self.print_archived_controllers()
-                return
+                break
             elif self.cycle_output == "Skip":
                 self.print_archived_controllers()
                 controller_list = GUIUtils.generate_random_controllers()
@@ -410,44 +398,12 @@ class HILGUI:
             else:
                 raise ValueError(f"Received an improper flag from HILGUI.cycle_output. Got {self.cycle_output}.")
 
+        print("Simulation terminated.")
+        print(f"Number of clicks: {self.number_of_clicks}")
+        print(f"Time elapsed: {self.get_time_string()}")
+
 
 class GUITile:
-
-    def get_tile_offset(self):
-        absolute_positions_by_index = [
-            (0, 0),
-            (500, 0),
-            (1000, 0),
-            (1500, 0),
-            (0, 500),
-            (500, 500),
-            (1000, 500),
-            (1500, 500)
-        ]
-        return absolute_positions_by_index[self.index]
-
-    def save_button_pressed(self):
-        if self.archived:
-            self.archived = False
-            self.save_button.bg_color = (150, 150, 150)
-        else:
-            self.archived = True
-            self.save_button.bg_color = (0, 150, 0)
-
-    def evolve_button_pressed(self):
-        if self.highlighted:
-            self.highlighted = False
-            self.gui.fit_controllers.remove(self.controller)
-            self.evolve_button.bg_color = (150, 150, 150)
-        else:
-            self.highlighted = True
-            self.gui.fit_controllers.append(self.controller)
-            self.evolve_button.bg_color = (0, 150, 0)
-            if len(self.gui.fit_controllers) > 2:
-                for tile in self.gui.tiles:
-                    tile.highlighted = False
-                    tile.evolve_button.bg_color = (150, 150, 150)
-                self.gui.fit_controllers = []
 
     def __init__(self, controller, index, abs_pos, parent_gui):
         self.gui = parent_gui
@@ -474,6 +430,49 @@ class GUITile:
         )
         self.highlighted = False
         self.archived = False
+
+    def get_tile_offset(self):
+        absolute_positions_by_index = [
+            (0, 0),
+            (500, 0),
+            (1000, 0),
+            (1500, 0),
+            (0, 500),
+            (500, 500),
+            (1000, 500),
+            (1500, 500)
+        ]
+        return absolute_positions_by_index[self.index]
+
+    def save_button_pressed(self):
+        if self.archived:
+            self.archived = False
+            self.save_button.bg_color = (150, 150, 150)
+        else:
+            self.archived = True
+            self.save_button.bg_color = (0, 150, 0)
+            self.gui.archived_controllers.append(self.controller)
+            filepath = "data/interesting-controllers.csv"
+            if self.gui.save_archived_controllers:
+                with open(filepath, 'a', newline='') as file:
+                    writer = csv.writer(file)
+                    # Write the new row to the CSV file
+                    writer.writerow(self.controller)
+
+    def evolve_button_pressed(self):
+        if self.highlighted:
+            self.highlighted = False
+            self.gui.fit_controllers.remove(self.controller)
+            self.evolve_button.bg_color = (150, 150, 150)
+        else:
+            self.highlighted = True
+            self.gui.fit_controllers.append(self.controller)
+            self.evolve_button.bg_color = (0, 150, 0)
+            if len(self.gui.fit_controllers) > 2:
+                for tile in self.gui.tiles:
+                    tile.highlighted = False
+                    tile.evolve_button.bg_color = (150, 150, 150)
+                self.gui.fit_controllers = []
 
     def draw(self):
         self.tile_surface.fill((0, 0, 0))
@@ -558,7 +557,7 @@ def configuration_screen():
     return settings
 
 
-def _update_manual_pdf():
+def update_manual_pdf():
     md_file_path = "HIL-GUI-manual.md"
     pdf_file_path = "HIL-GUI-manual.pdf"
     try:
@@ -567,6 +566,22 @@ def _update_manual_pdf():
         print(f"{md_file_path} does not exist.")
 
 
+def render_interesting_worlds():
+    interesting_behaviors_dirpath = "data/interesting-behaviors/"
+    world_cache_filepath = "data/interesting-controllers.csv"
+    df = pd.read_csv(world_cache_filepath, header=None)
+    for i, row in df.iterrows():
+        controller = list(row)
+        print(f"Number {i}. Controller = {controller}")
+        gif_filename = f"{controller}.gif"
+        gif_filepath = os.path.join(interesting_behaviors_dirpath, gif_filename)
+        world = RectangularWorld(GUIUtils.generate_heterogeneous_world_config(controller))
+        for _ in range(1200):
+            world.step()
+        get_gif_representation(world, gif_filepath, steps=1000)
+
+
 if __name__ == '__main__':
-    gui = HILGUI()
-    gui.run()
+    # gui = HILGUI(heterogeneous=True, save_archived_controllers=True)
+    # gui.run()
+    render_interesting_worlds()
