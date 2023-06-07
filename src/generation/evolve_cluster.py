@@ -137,7 +137,6 @@ def evolve_and_cluster(name, _type, network=None, gen=100, pop=100, cr=0.7, mr=0
                        lifespan=1200):
     world = TWO_SENSOR_WORLD_CONFIG if _type == "two-sensor" else SINGLE_SENSOR_WORLD_CONFIG
     world.population_size = agents
-    world.seed = seed
     model = {
         "out_name": name,
         "network": network,
@@ -166,6 +165,7 @@ def evolve_and_cluster(name, _type, network=None, gen=100, pop=100, cr=0.7, mr=0
             save_archive=False,
             show_gui=True,
             use_external_archive=False,
+            seed=seed,
         )
     }
 
