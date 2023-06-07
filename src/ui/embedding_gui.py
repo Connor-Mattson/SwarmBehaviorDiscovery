@@ -79,7 +79,7 @@ class EmbeddingGui(Cluster):
 
             screen.fill((0, 0, 0))
             for cluster_point in self.point_population:
-                cluster_point.draw(screen)
+                cluster_point.get_tile_surface(screen)
 
             for cluster_center in self.cluster_medoids:
                 pygame.draw.circle(screen, (255, 255, 255), (int(cluster_center[0]), int(cluster_center[1])),

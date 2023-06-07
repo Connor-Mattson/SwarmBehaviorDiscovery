@@ -18,6 +18,8 @@ from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
 import subprocess
+
+from src.generation.homogeneous_heuristic_filtering import HomogeneousFilter
 from src.ui.button import Button
 
 from novel_swarms.world.RectangularWorld import RectangularWorld
@@ -27,7 +29,6 @@ from data.img_process import get_image_map, generate_world_config
 sample_size = 10
 
 # Which portions of the program we should execute
-image_collection = False
 labeling = True
 stats = False
 
@@ -52,7 +53,7 @@ def _generate_random_controllers(num=6, length=4):
     return controls
 
 
-def _get_both_maps(control, index):
+def _get_all_maps(control, index):
     """
     Saves the image representations of the given controller as both a density map and a trail map.
     Useful for multiprocessing because you only have to step through the world 1500 times once overall,
@@ -112,14 +113,14 @@ def label_controller(index):
 
     def coherent_button_clicked():
         nonlocal coherent
-        coherent = True
         nonlocal running
+        coherent = True
         running = False
 
     def entropic_button_clicked():
         nonlocal coherent
-        coherent = False
         nonlocal running
+        coherent = False
         running = False
 
     coherent_button = Button("Coherent", (70, 25), (500+5, 300), on_click=coherent_button_clicked)
@@ -156,85 +157,173 @@ def label_controller(index):
 
 controller_list = _generate_random_controllers(num=sample_size)  # Generate a dataset of random controllers
 
-# If the user has enabled image collection, collect and store image + controller data using multiprocessing
-csv_filepath = "../../data/labeled-controllers.csv"
-if image_collection:
-    df = pd.DataFrame(controller_list)
-    df.insert(0, None, 0)
-    df.to_csv(csv_filepath, index=False, header=False)
 
-    max_processes = 4
-    pool = mp.Pool(processes=max_processes)
-    for i, c in enumerate(controller_list):
-        pool.apply_async(_get_both_maps, args=(c, i))
-    pool.close()
-    pool.join()
-
-# If the user has enabled labeling, loop over the stored controllers and allow the user to label them
-if labeling:
-    pygame.init()
-    df = pd.read_csv(csv_filepath, header=None)
-    for i in range(len(controller_list)):
-        if (i+1) % 50 == 0:
-            df.to_csv(csv_filepath, index=False, header=False)
-
-        label = label_controller(i)
-        # Handle cases where the file doesn't exist
-        if label is not None:
-            df.loc[i, 0] = label
-
-    pygame.quit()
-    df.to_csv(csv_filepath, index=False, header=False)
-
-if stats:
-    labeled_controllers = pd.read_csv(csv_filepath, header=None).to_numpy()
-    mean_light_values = []
-    labels = []
-    for i, row in enumerate(labeled_controllers):
-        label = row[0]
-        labels.append(label)
-        controller = row[1:].tolist()
-        density_filepath = f"../../data/trail-maps/controller-{i}.jpg"
-        density_image = None
-
-        try:
-            img = Image.open(density_filepath).convert('L')
-            image_array = np.array(img)
-            image_array_normalized = (image_array / np.max(image_array)) * 255
-            density_image = image_array_normalized.astype(np.uint8)
-        except FileNotFoundError:
-            mean_light_values.append(None)
-            continue
-
-        mean_light_values.append(np.mean(density_image))
-
-    entropic_light_values = []
-    coherent_light_values = []
-    for i in range(len(mean_light_values)):
-        if mean_light_values[i] is None:
-            continue
-
-        if labels[i] == 0:
-            entropic_light_values.append(mean_light_values[i])
-        elif labels[i] == 1:
-            coherent_light_values.append(mean_light_values[i])
-
+def _generic_histogram(entropic_light_values, coherent_light_values, histogram_name):
     # Plotting the histogram
     plt.hist(coherent_light_values, bins=range(0, 256, 3), color='green', alpha=0.5, label='Coherent')
     plt.hist(entropic_light_values, bins=range(0, 256, 3), color='red', alpha=0.5, label='Entropic')
 
     # Chart settings
-    plt.title('Average Brightness Histogram')
+    plt.title(histogram_name)
     plt.xlabel('Brightness Value')
     plt.ylabel('Frequency')
     plt.legend()
 
     # Saving the chart as a PNG
-    my_filepath = 'path_to_save_image.png'
-    plt.savefig(my_filepath)
+    # my_filepath = 'path_to_save_image.png'
+    # plt.savefig(my_filepath)
 
     # Display the chart
     plt.show()
 
 
-print("Done.")
+class HumanLabeling:
+
+    @staticmethod
+    def image_collection():
+        csv_filepath = "../../data/labeled-controllers.csv"
+        df = pd.DataFrame(controller_list)
+        df.insert(0, None, 0)
+        df.to_csv(csv_filepath, index=False, header=False)
+
+        max_processes = 4
+        pool = mp.Pool(processes=max_processes)
+        for i, c in enumerate(controller_list):
+            pool.apply_async(_get_all_maps, args=(c, i))
+        pool.close()
+        pool.join()
+
+    @staticmethod
+    def human_labeling():
+        csv_filepath = "../../data/labeled-controllers.csv"
+        pygame.init()
+        df = pd.read_csv(csv_filepath, header=None)
+        for i in range(len(controller_list)):
+            if (i+1) % 50 == 0:
+                df.to_csv(csv_filepath, index=False, header=False)
+
+            label = label_controller(i)
+            # Handle cases where the file doesn't exist
+            if label is not None:
+                df.loc[i, 0] = label
+
+        pygame.quit()
+        df.to_csv(csv_filepath, index=False, header=False)
+
+    @staticmethod
+    def get_histogram():
+        csv_filepath = "../../data/labeled-controllers.csv"
+        labeled_controllers = pd.read_csv(csv_filepath, header=None).to_numpy()
+        mean_light_values = []
+        labels = []
+        for i, row in enumerate(labeled_controllers):
+            label = row[0]
+            labels.append(label)
+            controller = row[1:].tolist()
+            density_filepath = f"../../data/trail-maps/controller-{i}.jpg"
+            density_image = None
+
+            try:
+                img = Image.open(density_filepath).convert('L')
+                image_array = np.array(img)
+                image_array_normalized = (image_array / np.max(image_array)) * 255
+                density_image = image_array_normalized.astype(np.uint8)
+            except FileNotFoundError:
+                mean_light_values.append(None)
+                continue
+
+            mean_light_values.append(np.mean(density_image))
+
+        entropic_light_values = []
+        coherent_light_values = []
+        for i in range(len(mean_light_values)):
+            if mean_light_values[i] is None:
+                continue
+
+            if labels[i] == 0:
+                entropic_light_values.append(mean_light_values[i])
+            elif labels[i] == 1:
+                coherent_light_values.append(mean_light_values[i])
+
+        _generic_histogram(entropic_light_values, coherent_light_values, "Average Brightness Histogram")
+
+
+class GECCOBaselineImages:
+    @staticmethod
+    def filter_lines():
+        csv_filepath = "../../data/testing_labels.csv"
+        labeled_controllers = pd.read_csv(csv_filepath, header=None).to_numpy()
+        valid_rows = []
+        for i, row in enumerate(labeled_controllers):
+            controller = row[1:]
+            if HomogeneousFilter.filter(controller):
+                print(row)
+                valid_rows.append(row)
+        filtered_controllers = pd.DataFrame(np.array(valid_rows))
+        filtered_controllers.to_csv(csv_filepath, index=False, header=False)
+
+
+    @staticmethod
+    def image_collection():
+        csv_filepath = "../../data/testing_labels.csv"
+        labeled_controllers = pd.read_csv(csv_filepath, header=None).to_numpy()
+        max_processes = 4
+        pool = mp.Pool(processes=max_processes)
+        for i, row in enumerate(labeled_controllers):
+            controller = row[1:]
+            pool.apply_async(_get_all_maps, args=(controller, i))
+        pool.close()
+        pool.join()
+
+    @staticmethod
+    def _get_light_values():
+        density_light_values = []
+        trail_light_values = []
+        for i in range(1000):
+            density_filepath = f"../../data/density-maps/controller-{i}.jpg"
+            img = Image.open(density_filepath).convert('L')
+            image_array = np.array(img).astype(np.uint8)
+            # image_array_normalized = (image_array / np.max(image_array)) * 255
+            # density_image = image_array_normalized.astype(np.uint8)
+            density_light_values.append(np.mean(image_array))
+
+            trail_filepath = f"../../data/trail-maps/controller-{i}.jpg"
+            img = Image.open(trail_filepath).convert('L')
+            image_array = np.array(img).astype(np.uint8)
+            trail_light_values.append(np.mean(image_array))
+        results = (density_light_values, trail_light_values)
+        return results
+
+    @staticmethod
+    def get_histogram():
+        density_light_values, trail_light_values = GECCOBaselineImages._get_light_values()
+        coherent_density_light_values = []
+        coherent_trail_light_values = []
+        entropic_density_light_values = []
+        entropic_trail_light_values = []
+        csv_filepath = "../../data/testing_labels.csv"
+        labeled_controllers = pd.read_csv(csv_filepath, header=None).to_numpy()
+        for i, row in enumerate(labeled_controllers):
+            density_light_value = density_light_values[i]
+            trail_light_value = trail_light_values[i]
+            label = row[0]
+            if label == 0:
+                entropic_trail_light_values.append(trail_light_value)
+                entropic_density_light_values.append(density_light_value)
+            else:
+                coherent_trail_light_values.append(trail_light_value)
+                coherent_density_light_values.append(density_light_value)
+        _generic_histogram(
+            entropic_density_light_values,
+            coherent_density_light_values,
+            "Average Brightness Histogram for Density Maps"
+        )
+        _generic_histogram(
+            entropic_trail_light_values,
+            coherent_trail_light_values,
+            "Average Brightness Histogram for Trail Maps"
+        )
+
+
+if __name__ == '__main__':
+    GECCOBaselineImages.filter_lines()
