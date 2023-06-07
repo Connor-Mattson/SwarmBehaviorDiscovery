@@ -5,6 +5,7 @@ https://direct.mit.edu/artl/article-abstract/15/1/105/2623/Swarm-Chemistry
 Human picks 1-2 out of 6 behaviors shown on a GUI.
 Behaviors are subsequently mutated and combined, or just mutated if only one is selected.
 In this case, the human acts as the fitness function, searching for novel/interesting behaviors.
+For instructions on how to operate this GUI, view `HIL-GUI-manual.pdf`
 
 Author: Jeremy Clark
 """
@@ -15,10 +16,9 @@ import random
 import pandas as pd
 import pygame
 from collections import namedtuple, deque
-from copy import copy, deepcopy
+from copy import copy
 import subprocess
 import time
-import psutil
 import csv
 
 from src.ui.button import Button
@@ -38,6 +38,9 @@ from novel_swarms.world.RectangularWorld import RectangularWorld
 
 
 class GUIUtils:
+    """
+    Static utility functions for the GUI
+    """
     @staticmethod
     def generate_heterogeneous_world_config(controller):
         """
@@ -196,7 +199,7 @@ class GUIUtils:
     @staticmethod
     def truncate_controller(controller):
         """
-        Truncate the decimals on the given controller so that it can be displayed
+        Truncate the decimals on the given controller so that it can be displayed conveniently
         """
         return [round(n, 2) for n in controller]
 
@@ -220,45 +223,61 @@ class GUIUtils:
 
 
 class HILGUI:
+    """
+    Object representing the state of the HIL GUI.
+    The GUI consists of `tiles`, which each display a separate simulation.
+    For more information about how to operate it, see HIL-GUI-manual.pdf
+    """
     def __init__(
             self,
-            heterogeneous=False,
-            steps_per_frame=5,
-            time_limit=None,
-            click_limit=None,
-            save_archived_controllers=False,
+            heterogeneous=False,  # Whether we're representing a heterogeneous swarm
+            steps_per_frame=5,  # Timestep interval between screen flips
+            time_limit=None,  # The maximum amount of time the user may use.
+            click_limit=None,  # The maximum number of steps forward or backward a generation that a user may make.
+            save_archived_controllers=False,  # Whether we should save the controllers in the archive as GIFs
     ):
-        pygame.init()
-        self.steps_per_frame = steps_per_frame
-        self.timesteps = 0
-        self.generation = 0
-        self.stats_width = 200
-        self.width = 2000 + self.stats_width
-        self.height = 1000
-        self.parent_screen = pygame.display.set_mode((self.width, self.height))
-        self.tile_width = 500
-        self.tile_height = 500
-        self.stats_surface = pygame.Surface((self.stats_width, self.height))
-        offset = (self.width - self.stats_width, 0)
-        self.skip_button = Button("Skip", (60, 25), (5, 150), self.skip, offset=offset)
-        self.advance_button = Button("Advance", (60, 25), (5, 180), self.advance, offset=offset)
-        self.back_button = Button("Back", (60, 25), (5, 210), self.back, offset=offset)
-        self.running = True
-        self.cycle_output = None
-        self.tiles = None
-        self.controller_history = deque()
-        self.fit_controllers = []
         self.heterogeneous = heterogeneous
-        self.start_time = None
+        self.steps_per_frame = steps_per_frame
         self.time_limit = time_limit
-        self.click_limit = None
-        self.number_of_clicks = 0
-        self.save_archived_controllers = save_archived_controllers
         self.click_limit = click_limit
-        self.cpu_threshold = 50
-        self.archived_controllers = []
+        self.save_archived_controllers = save_archived_controllers
+
+        pygame.init()
+        self.timesteps = 0  # How many timesteps the current generation has taken
+        self.generation = 0  # The current generation of controllers
+        self.stats_width = 200  # The width of the stats sidebar (pixels)
+        self.width = 2000 + self.stats_width  # The total width of the GUI (pixels)
+        self.height = 1000  # The total height of the GUI (pixels)
+        # The background screen. Everything else is blitted, directly or indirectly, onto this screen
+        self.parent_screen = pygame.display.set_mode((self.width, self.height))
+        self.tile_width = 500  # The width of each tile (pixels)
+        self.tile_height = 500  # The height of each tile (pixels)
+        # The surface that has stats and controls
+        self.stats_surface = pygame.Surface((self.stats_width, self.height))
+        # The offset of the stats bar relative to the background screen
+        stats_offset = (self.width - self.stats_width, 0)
+        # Buttons on the stats screen
+        self.skip_button = Button("Skip", (60, 25), (5, 150), self.skip, offset=stats_offset)
+        self.advance_button = Button("Advance", (60, 25), (5, 180), self.advance, offset=stats_offset)
+        self.back_button = Button("Back", (60, 25), (5, 210), self.back, offset=stats_offset)
+        self.running = True  # Whether the current generation is running
+        self.cycle_output = None  # Collects output at the end of each generation for event handling
+        self.tiles = None  # A list of tile objects corresponding to this generation
+        # A stack where elements are lists of controllers. Top = current generation, bottom = first generation
+        self.controller_history = deque()
+        self.fit_controllers = []  # Controllers selected for evolution
+        self.start_time = None  # The time when the GUI was opened (seconds)
+        self.number_of_clicks = 0  # How many times the user has gone forward or back
+        self.archived_controllers = []  # Controllers to be saved
 
     def get_tiles_from_controllers(self, controller_list):
+        """
+        Utility function for displaying tiles on the GUI.
+        :param controller_list: A list of controllers.
+        :return: The tiles corresponding to the controllers of `controller_list`
+        """
+        # Indices of list correspond to the tile index, which increases from top to bottom and left to right
+        # Used for putting the tiles in the right place on the GUI
         absolute_positions_by_index = [
             (0, 0),
             (500, 0),
@@ -276,37 +295,57 @@ class HILGUI:
         return tiles
 
     def print_archived_controllers(self):
+        """
+        Prints the list of controllers that have been marked for archive during this generation.
+        Does NOT print the entire list of controllers that have ever been marked for archive.
+        :return: A list of truncated controllers
+        """
         for tile in self.tiles:
             if tile.archived:
                 truncated_controller = GUIUtils.truncate_controller(tile.controller)
                 print(truncated_controller)
 
     def skip(self):
+        """
+        Runs when the Skip button is pressed.
+        """
         self.running = False
         self.cycle_output = "Skip"
 
     def back(self):
+        """
+        Runs when the Back button is pressed.
+        """
+        # We cannot go back any further if the generation <= 0
         if self.generation > 0:
             self.running = False
             self.cycle_output = "Back"
 
     def advance(self):
+        """
+        Runs when the Advance button is pressed.
+        """
         fit_controllers = self.fit_controllers
+        # If the number of controllers selected for evolution is not 1 or 2, don't do anything
         if len(fit_controllers) in (1, 2):
             self.running = False
             self.cycle_output = fit_controllers
 
     def get_time_string(self):
+        """
+        :return: The time since the GUI was opened is H:M:S format
+        """
         current_time = time.time()
         seconds = current_time - self.start_time
         hours, remainder = divmod(seconds, 3600)
         minutes, seconds = divmod(remainder, 60)
+        # TODO: Add placeholder zeroes
         return f"{int(hours)}:{int(minutes)}:{int(seconds)}"
 
-    def draw(self):
-        self.parent_screen.fill((0, 0, 0))
-        for tile in self.tiles:
-            tile.draw()
+    def draw_stats_surface(self):
+        """
+        Helper function for drawing the main GUI. Draws the sidebar.
+        """
         self.stats_surface.fill((0, 0, 0))
         text_x, text_y = 0, 20
         pygame.font.init()
@@ -329,23 +368,41 @@ class HILGUI:
         self.advance_button.draw(self.stats_surface)
         self.back_button.draw(self.stats_surface)
         self.parent_screen.blit(self.stats_surface, (self.width - self.stats_width, 0))
+
+    def draw(self):
+        """
+        Draws the current frame of the GUI.
+        """
+        self.parent_screen.fill((0, 0, 0))
+        # Draw every tile
+        for tile in self.tiles:
+            tile.draw()
+        self.stats_surface.blit(self.parent_screen, (self.width-self.stats_width, 0))
         pygame.display.flip()
 
-    def step_all_worlds(self):
+    def _step_all_worlds(self):
+        """
+        Advances all the current worlds in the generation by one step.
+        """
         for tile in self.tiles:
             tile.world.step()
 
-    def one_cycle(self):
+    def _one_cycle(self):
+        """
+        Runs one generation of simulation.
+        :return: The termination flag associated with this generation. Tells driver function how to handle it.
+        """
+        # Get the current generation of controllers off of the history stack.
         current_controllers = self.controller_history[-1]
         self.tiles = self.get_tiles_from_controllers(current_controllers)
-        psutil.cpu_percent(interval=None, percpu=True)
+
         while self.running:
+            # Event handling
             events = pygame.event.get()
             for event in events:
                 if event.type == pygame.QUIT:
                     self.cycle_output = "Quit"
                     return
-            # Listen for button clicks
             self.back_button.listen(events)
             self.skip_button.listen(events)
             self.advance_button.listen(events)
@@ -353,7 +410,7 @@ class HILGUI:
                 tile.evolve_button.listen(events)
                 tile.save_button.listen(events)
 
-            self.step_all_worlds()
+            self._step_all_worlds()  # Advance every world by one timestep
             self.timesteps += 1
             pygame.event.pump()  # Prevent force quit window from appearing
 
@@ -361,55 +418,68 @@ class HILGUI:
             if self.timesteps % self.steps_per_frame == 0:
                 self.draw()
 
+        # If this block was reached, it means that the user did not try to quit the GUI
         self.number_of_clicks += 1
         self.timesteps = 0
-        self.running = True
+        self.running = True  # Set this back to True for the next generation
 
     def run(self):
-        self.start_time = time.time()
+        """
+        Driver function for program execution.
+        """
+        self.start_time = time.time()  # The time at the start of the program execution
         while True:
+            # Handle limit breaching
             if self.click_limit is not None and self.number_of_clicks >= self.click_limit:
                 print(f"Click limit of {self.click_limit} clicks reached.")
                 return
             elapsed_time = self.get_time_string()
             if self.time_limit is not None and elapsed_time >= self.time_limit:
                 print(f"Time limit of {elapsed_time} reached.")
+
+            # If there is nothing in the controller history, add a list of randomly-generated controllers
             if len(self.controller_history) == 0:
                 random_controllers = GUIUtils.generate_random_controllers()
                 self.controller_history.append(random_controllers)
-            self.cycle_output = "_"
-            self.one_cycle()
+            self._one_cycle()
+
+            # If the user pressed "Advance", cycle_output is set to the list of controllers to advance with
             if type(self.cycle_output) == list:
                 controller_list = GUIUtils.get_new_generation(self.cycle_output)
                 self.controller_history.append(controller_list)
                 self.generation += 1
+            # If the user quits, print the controllers marked for archive this generation and break.
             elif self.cycle_output == "Quit":
                 self.print_archived_controllers()
                 break
+            # If the user skips, randomly generate a new controller list for the next generation
             elif self.cycle_output == "Skip":
                 self.print_archived_controllers()
                 controller_list = GUIUtils.generate_random_controllers()
                 self.controller_history.append(controller_list)
                 self.generation += 1
+            # If the user wants to go back, pop a controller list off the controller history stack
             elif self.cycle_output == "Back" and self.generation > 0:
                 self.print_archived_controllers()
                 self.controller_history.pop()
                 self.generation -= 1
+            # Handle wrong flag type
             else:
                 raise ValueError(f"Received an improper flag from HILGUI.cycle_output. Got {self.cycle_output}.")
 
-        print("Simulation terminated.")
+        # Print stats
+        print("Simulation terminated. We hope to see you again!")
         print(f"Number of clicks: {self.number_of_clicks}")
         print(f"Time elapsed: {self.get_time_string()}")
 
 
 class GUITile:
-
     def __init__(self, controller, index, abs_pos, parent_gui):
-        self.gui = parent_gui
         self.controller = controller
         self.index = index
         self.abs_pos = abs_pos
+        self.gui = parent_gui
+
         self.world = GUIUtils.generate_world(controller, heterogeneous=parent_gui.heterogeneous)
         self.tile_surface = pygame.Surface((self.gui.tile_width, self.gui.tile_height))
         save_button_coords = (self.gui.tile_width - 70, self.gui.tile_height - 25)

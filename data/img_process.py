@@ -13,6 +13,7 @@ import pygame
 import imageio
 import tempfile
 import os
+from functools import lru_cache
 
 from novel_swarms.config.AgentConfig import DiffDriveAgentConfig
 from novel_swarms.config.WorldConfig import RectangularWorldConfig
@@ -21,6 +22,7 @@ from novel_swarms.sensors.SensorSet import SensorSet
 from novel_swarms.world.RectangularWorld import RectangularWorld
 
 
+@lru_cache(maxsize=5)
 def _make_circle_mask(radius=5):
     """
     Returns a square 2d numpy array with dimensions twice the given radius.
@@ -41,10 +43,6 @@ def _make_circle_mask(radius=5):
         if dist > 5:
             mask[h, w] = 1
     return mask
-
-
-# Setting this as a constant so that it only needs to be computed once
-CIRCLE_MASK = _make_circle_mask()
 
 
 def _generate_blur_kernel(dim, sigma):
@@ -148,7 +146,7 @@ def _apply_circle_mask(output, x, y, radius):
     y -= radius
     # For some reason this very rarely throws an exception, in which case just skip it
     try:
-        output[y:y+radius*2, x:x+radius*2] *= CIRCLE_MASK
+        output[y:y+radius*2, x:x+radius*2] *= _make_circle_mask()
     except ValueError:
         pass
 
@@ -214,10 +212,13 @@ def get_gif_representation(world, filepath, steps=500, skip=5):
     in the filepath. `skip` specifies the number of steps between data collection.
     """
     screen = pygame.display.set_mode((500, 500), flags=pygame.HIDDEN)
+    # A temporary directory to store all the frames of the GIF
     temp_dir = tempfile.TemporaryDirectory()
+
     for i in range(steps):
         world.step()
         screen.fill((0, 0, 0))
+        # If it's time to collect image data, save it to the temporary directory
         if i % skip == 0:
             world.draw(screen)
             pygame.display.flip()
@@ -227,12 +228,14 @@ def get_gif_representation(world, filepath, steps=500, skip=5):
             temp_path = os.path.join(temp_dir.name, f"frame-{frame_number}.jpg")
             img.save(temp_path)
 
-    number_of_frames = steps // skip
+    number_of_frames = steps // skip  # The number of frames in the GIF
     frames = []
+    # Iterate over all the frames and combine them into a single GIF
     for i in range(number_of_frames):
         img = imageio.v2.imread(os.path.join(temp_dir.name, f"frame-{i}.jpg"))
         frames.append(img)
     imageio.mimsave(filepath, frames, duration=100, loop=0)
+    # Delete the contents of the temporary directory
     temp_dir.cleanup()
 
 
@@ -255,20 +258,22 @@ def get_image_map(controller, representation, filepath=None, frame_start=1200, w
     # The function used to analyze the image
     analyzer = func_dict[representation]
 
+    # If a world was not provided, create one and step it to `frame_start`
     if world is None:
         config = generate_world_config(controller)
         world = RectangularWorld(config)
         for _ in range(frame_start):
             world.step()
 
+    # If were saving as a GIF, call get_gif_representation immediately because the process for handling output differs
     if representation == "gif":
         get_gif_representation(world, filepath)
         return
 
-    output = analyzer(world)
-    img = Image.fromarray(output.astype('uint8'), 'L')
+    output = analyzer(world)  # Get image matrix
+    img = Image.fromarray(output.astype('uint8'), 'L')  # Save as a grayscale
     if filepath is None:
-        # If there is no filepath, just show it
+        # If there is no filepath specified just show it
         img.show()
     else:
         img.save(filepath)
