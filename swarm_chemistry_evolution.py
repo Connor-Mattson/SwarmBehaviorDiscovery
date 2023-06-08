@@ -16,10 +16,11 @@ import random
 import pandas as pd
 import pygame
 from collections import namedtuple, deque
-from copy import copy
+from copy import copy, deepcopy
 import subprocess
 import time
 import csv
+import gc
 
 from src.ui.button import Button
 from data.img_process import get_gif_representation
@@ -138,14 +139,21 @@ class GUIUtils:
         return mutated_controller
 
     @staticmethod
-    def _crossover(index, c1, c2, rand_val):
-        """
-        Performs crossover on the given two controllers at the given index.
-        If rand_val > 0.5, then c1 is returned with a swap at `index`.
-        Otherwise, c2 is returned with a swap at `index`.
-        Does not mutate any of the parameters.
-        :return: A "crossed-over" version of one of the controllers
-        """
+    def _heterogeneous_crossover(c1, c2):
+        target_controller = deepcopy(c1) if random.random() > 0.5 else deepcopy(c2)
+        supplement_controller = deepcopy(c2) if target_controller == c1 else deepcopy(c1)
+        beg_index = 1 if random.random() > 0.5 else 5
+        supplement_subspecies = supplement_controller[beg_index:beg_index+4]
+        target_subspecies = target_controller[beg_index:beg_index+4]
+        cross_index = math.floor(random.random() * 4)
+        supplement_subspecies[cross_index] = target_subspecies[cross_index]
+        target_controller[beg_index:beg_index+4] = supplement_subspecies
+        return target_controller
+
+    @staticmethod
+    def _homogeneous_crossover(c1, c2):
+        index = math.floor(random.random() * len(c1))
+        rand_val = random.random()
         if rand_val > 0.5:
             offspring = copy(c1)
             offspring[index] = c2[index]
@@ -156,6 +164,15 @@ class GUIUtils:
             return offspring
 
     @staticmethod
+    def _crossover(c1, c2):
+        if len(c1) == 4:
+            return GUIUtils._homogeneous_crossover(c1, c2)
+        elif len(c1) == 9:
+            return GUIUtils._heterogeneous_crossover(c1, c2)
+        else:
+            raise ValueError("Controllers must be of length 4 or 9.")
+
+    @staticmethod
     def _breed_controllers(c1, c2):
         """
         Mutates and randomly combines the two given controllers using crossover.
@@ -164,8 +181,7 @@ class GUIUtils:
         # Mutate the controllers before combining
         c1 = GUIUtils._mutate_controller(c1)
         c2 = GUIUtils._mutate_controller(c2)
-        crossover_index = math.floor(random.random() * len(c1))
-        return GUIUtils._crossover(crossover_index, c1, c2, random.random())
+        return GUIUtils._crossover(c1, c2)
 
     @staticmethod
     def get_new_generation(fit_controllers):
@@ -266,19 +282,18 @@ class HILGUI:
         # A stack where elements are lists of controllers. Top = current generation, bottom = first generation
         self.controller_history = deque()
         self.fit_controllers = []  # Controllers selected for evolution
-        self.start_time = None  # The time when the GUI was opened (seconds)
+        self.start_time = time.time()  # The time when the GUI was opened (seconds)
         self.number_of_clicks = 0  # How many times the user has gone forward or back
         self.archived_controllers = []  # Controllers to be saved
+        pygame.font.init()
+        font = pygame.font.Font(None, 25)
+        self.white_color = (255, 255, 255)
+        self.generation_text = font.render(f"Current generation: {self.generation}", True, self.white_color)
+        self.click_text = font.render(f"Number of clicks: {self.number_of_clicks}", True, self.white_color)
+        del font
+        pygame.font.quit()
 
-    def get_tiles_from_controllers(self, controller_list):
-        """
-        Utility function for displaying tiles on the GUI.
-        :param controller_list: A list of controllers.
-        :return: The tiles corresponding to the controllers of `controller_list`
-        """
-        # Indices of list correspond to the tile index, which increases from top to bottom and left to right
-        # Used for putting the tiles in the right place on the GUI
-        absolute_positions_by_index = [
+        self.absolute_positions_by_index = [
             (0, 0),
             (500, 0),
             (1000, 0),
@@ -288,8 +303,17 @@ class HILGUI:
             (1000, 500),
             (1500, 500)
         ]
+
+    def get_tiles_from_controllers(self, controller_list):
+        """
+        Utility function for displaying tiles on the GUI.
+        :param controller_list: A list of controllers.
+        :return: The tiles corresponding to the controllers of `controller_list`
+        """
+        # Indices of list correspond to the tile index, which increases from top to bottom and left to right
+        # Used for putting the tiles in the right place on the GUI
         tiles = [
-            GUITile(controller_list[i], i, absolute_positions_by_index[i], self)
+            GUITile(controller_list[i], i, self.absolute_positions_by_index[i], self)
             for i in range(8)
         ]
         return tiles
@@ -346,23 +370,24 @@ class HILGUI:
         """
         Helper function for drawing the main GUI. Draws the sidebar.
         """
-        self.stats_surface.fill((0, 0, 0))
-        text_x, text_y = 0, 20
         pygame.font.init()
         font = pygame.font.Font(None, 25)
-        white_color = (255, 255, 255)
-        text = font.render(f"Current generation: {self.generation}", True, white_color)
-        self.stats_surface.blit(text, (text_x, text_y))
-        text_y += 30
-        text = font.render(f"Timesteps: {self.timesteps}", True, white_color)
-        self.stats_surface.blit(text, (text_x, text_y))
-        text_y += 30
-        text = font.render(self.get_time_string(), True, white_color)
-        self.stats_surface.blit(text, (text_x, text_y))
-        text_y += 30
-        text = font.render(f"Number of clicks: {self.number_of_clicks}", True, white_color)
-        self.stats_surface.blit(text, (text_x, text_y))
+        timestep_text = font.render(f"Timesteps: {self.timesteps}", True, self.white_color)
+        time_text = font.render(self.get_time_string(), True, self.white_color)
+        del font
         pygame.font.quit()
+        self.stats_surface.fill((0, 0, 0))
+        text_x, text_y = 0, 20
+        self.stats_surface.blit(self.generation_text, (text_x, text_y))
+        text_y += 30
+        self.stats_surface.blit(self.click_text, (text_x, text_y))
+        text_y += 30
+        self.stats_surface.blit(timestep_text, (text_x, text_y))
+        text_y += 30
+        self.stats_surface.blit(time_text, (text_x, text_y))
+
+        del timestep_text
+        del time_text
 
         self.skip_button.draw(self.stats_surface)
         self.advance_button.draw(self.stats_surface)
@@ -377,6 +402,7 @@ class HILGUI:
         # Draw every tile
         for tile in self.tiles:
             tile.draw()
+        self.draw_stats_surface()
         self.stats_surface.blit(self.parent_screen, (self.width-self.stats_width, 0))
         pygame.display.flip()
 
@@ -427,7 +453,6 @@ class HILGUI:
         """
         Driver function for program execution.
         """
-        self.start_time = time.time()  # The time at the start of the program execution
         while True:
             # Handle limit breaching
             if self.click_limit is not None and self.number_of_clicks >= self.click_limit:
@@ -467,6 +492,18 @@ class HILGUI:
             else:
                 raise ValueError(f"Received an improper flag from HILGUI.cycle_output. Got {self.cycle_output}.")
 
+            pygame.font.init()
+            font = pygame.font.Font(None, 25)
+            self.generation_text = font.render(f"Current generation: {self.generation}", True, self.white_color)
+            self.click_text = font.render(f"Number of clicks: {self.number_of_clicks}", True, self.white_color)
+            pygame.font.quit()
+
+            for tile in self.tiles:
+                tile.close()
+                del tile
+            self.tiles = None
+            gc.collect()
+
         # Print stats
         print("Simulation terminated. We hope to see you again!")
         print(f"Number of clicks: {self.number_of_clicks}")
@@ -500,6 +537,11 @@ class GUITile:
         )
         self.highlighted = False
         self.archived = False
+        pygame.font.init()
+        font = pygame.font.Font(None, 18)
+        truncated_controller = GUIUtils.truncate_controller(self.controller)
+        self.text = font.render(f"Params: {truncated_controller}", True, (0, 0, 0))
+        pygame.font.quit()
 
     def get_tile_offset(self):
         absolute_positions_by_index = [
@@ -521,7 +563,7 @@ class GUITile:
         else:
             self.archived = True
             self.save_button.bg_color = (0, 150, 0)
-            self.gui.archived_controllers.append(self.controller)
+            self.gui.archived_controllers.append(deepcopy(self.controller))
             filepath = "data/interesting-controllers.csv"
             if self.gui.save_archived_controllers:
                 with open(filepath, 'a', newline='') as file:
@@ -536,7 +578,7 @@ class GUITile:
             self.evolve_button.bg_color = (150, 150, 150)
         else:
             self.highlighted = True
-            self.gui.fit_controllers.append(self.controller)
+            self.gui.fit_controllers.append(deepcopy(self.controller))
             self.evolve_button.bg_color = (0, 150, 0)
             if len(self.gui.fit_controllers) > 2:
                 for tile in self.gui.tiles:
@@ -548,17 +590,16 @@ class GUITile:
         self.tile_surface.fill((0, 0, 0))
         self.world.draw(self.tile_surface)
         pygame.draw.rect(self.tile_surface, (255, 255, 255), (0, 0, self.gui.tile_width-50, 15))
-        pygame.font.init()
-        font = pygame.font.Font(None, 18)
-        truncated_controller = GUIUtils.truncate_controller(self.controller)
-        text = font.render(f"Params: {truncated_controller}", True, (0, 0, 0))
-        pygame.font.quit()
-        self.tile_surface.blit(text, (0, 0))
+        self.tile_surface.blit(self.text, (0, 0))
         self.save_button.draw(self.tile_surface)
         self.evolve_button.draw(self.tile_surface)
 
         parent_screen = self.gui.parent_screen
         parent_screen.blit(self.tile_surface, self.abs_pos)
+
+    def close(self):
+        self.gui = None
+        del self
 
 
 def configuration_screen():
@@ -652,6 +693,5 @@ def render_interesting_worlds():
 
 
 if __name__ == '__main__':
-    # gui = HILGUI(heterogeneous=True, save_archived_controllers=True)
-    # gui.run()
-    render_interesting_worlds()
+    gui = HILGUI(heterogeneous=True, save_archived_controllers=True)
+    gui.run()

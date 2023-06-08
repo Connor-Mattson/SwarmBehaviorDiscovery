@@ -9,6 +9,10 @@ class Button:
         self.offset = offset
         self.on_click = on_click
         self.rel_pos = rel_pos
+        pygame.font.init()
+        font = pygame.font.Font(None, size=20)
+        self.rendered_text = font.render(self.text, True, (0, 0, 0))
+        pygame.font.quit()
 
     def get_abs_pos(self):
         rel_x, rel_y = self.rel_pos
@@ -38,9 +42,5 @@ class Button:
     def draw(self, surface):
         button_surface = pygame.Surface(self.dims)
         button_surface.fill(self.bg_color)
-        pygame.font.init()
-        font = pygame.font.Font(None, size=20)
-        text = font.render(self.text, True, (0, 0, 0))
-        button_surface.blit(text, (0, 0))
-        pygame.font.quit()
+        button_surface.blit(self.rendered_text, (0, 0))
         surface.blit(button_surface, self.rel_pos)
