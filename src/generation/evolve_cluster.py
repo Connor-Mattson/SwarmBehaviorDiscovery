@@ -13,7 +13,7 @@ from src.hil.HIL import HIL
 import time
 from src.networks.ensemble import Ensemble
 from src.networks.network_wrapper import NetworkWrapper
-from src.constants import DEFAULT_OUTPUT_CONFIG, TWO_SENSOR_GENE_MODEL, SINGLE_SENSOR_GENE_MODEL, SINGLE_SENSOR_WORLD_CONFIG, TWO_SENSOR_WORLD_CONFIG, SINGLE_SENSOR_HETEROGENEOUS_MODEL, SINGLE_SENSOR_HETEROGENEOUS_WORLD_CONFIG
+from src.constants import DEFAULT_OUTPUT_CONFIG, TWO_SENSOR_GENE_MODEL, SINGLE_SENSOR_GENE_MODEL, SINGLE_SENSOR_WORLD_CONFIG, TWO_SENSOR_WORLD_CONFIG, SINGLE_SENSOR_HETEROGENEOUS_MODEL, SINGLE_SENSOR_HETEROGENEOUS_WORLD_CONFIG, HETEROGENEOUS_SUBGROUP_BEHAVIOR
 from novel_swarms.config.EvolutionaryConfig import GeneticEvolutionConfig
 from novel_swarms.config.defaults import ConfigurationDefaults
 
@@ -118,7 +118,8 @@ def execute_from_model(MODEL):
                 print(baseline_behavior)
                 evolution.archive.addToArchive(baseline_behavior, genome)
 
-        _, _ = record_medoids(network, dataset, medoids=MODEL["config"]["k"], name=out_name)
+        if MODEL["export_medoids"]:
+            _, _ = record_medoids(network, dataset, medoids=MODEL["config"]["k"], name=out_name)
 
         start_time = time.time()
         embedded_archive = getEmbeddedArchive(dataset, network, concat_behavior=True if MODEL["network"] and MODEL["concat"] else False)
@@ -135,7 +136,7 @@ def execute_from_model(MODEL):
 
 
 def evolve_and_cluster(name, _type, network=None, gen=100, pop=100, cr=0.7, mr=0.15, k=12, seed=None, agents=24,
-                       lifespan=1200, heterogeneous=False):
+                       lifespan=1200, heterogeneous=False, concat=False, export_medoids=False):
 
     gene_builder = None
     if heterogeneous:
@@ -146,6 +147,7 @@ def evolve_and_cluster(name, _type, network=None, gen=100, pop=100, cr=0.7, mr=0
         world = TWO_SENSOR_WORLD_CONFIG if _type == "two-sensor" else SINGLE_SENSOR_WORLD_CONFIG
 
     world.population_size = agents
+    world.behavior = ConfigurationDefaults.BEHAVIOR_VECTOR if not concat else HETEROGENEOUS_SUBGROUP_BEHAVIOR
     model = {
         "out_name": name,
         "network": network,
@@ -160,10 +162,11 @@ def evolve_and_cluster(name, _type, network=None, gen=100, pop=100, cr=0.7, mr=0
             "crossover_rate": cr,
             "mutation_rate": mr,
         },
-        "concat": False,
+        "concat": concat,
+        "export_medoids": export_medoids,
         "g_e": GeneticEvolutionConfig(
             gene_builder=gene_builder,
-            phenotype_config=ConfigurationDefaults.BEHAVIOR_VECTOR,
+            phenotype_config=ConfigurationDefaults.BEHAVIOR_VECTOR if not concat else HETEROGENEOUS_SUBGROUP_BEHAVIOR,
             n_generations=gen,
             n_population=pop,
             crossover_rate=cr,

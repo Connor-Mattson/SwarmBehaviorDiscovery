@@ -51,7 +51,7 @@ nbconvert==7.0.0
 nbformat==5.6.0
 nest-asyncio==1.5.5
 notebook==6.4.12
-novel-swarms==0.1.7a0
+novel-swarms==0.1.8a0
 numpy==1.23.1
 nvidia-cublas-cu11==11.10.3.66
 nvidia-cuda-nvrtc-cu11==11.7.99

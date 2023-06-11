@@ -16,6 +16,8 @@ flags.DEFINE_integer("seed", None, "Random Seed", lower_bound=0)
 flags.DEFINE_integer("k", 12, "k value used in k-Medoids Calculation", lower_bound=0)
 flags.DEFINE_bool("heuristic", True, "Whether to use the heuristic filter in evolution")
 flags.DEFINE_bool("heterogeneous", False, "Whether to evolve swarms that are heterogeneous or not")
+flags.DEFINE_bool("concat", False, "Whether to evaluate features at the subgroup level and concatenate subgroup behaviors into one vector for novelty search")
+flags.DEFINE_bool("exp_medoids", False, "Whether to export medoids at each generation.")
 flags.DEFINE_float("cr", 0.7, "Crossover Rate", lower_bound=0.0, upper_bound=1.0)
 flags.DEFINE_float("mr", 0.15, "Mutation Rate", lower_bound=0.0, upper_bound=1.0)
 flags.DEFINE_enum("strategy", "Mattson_and_Brown", STRATEGY_TYPES, "The type of evolutionary strategy to use")
@@ -29,11 +31,11 @@ def main(_):
         if FLAGS.checkpoint is None:
             raise Exception("Mattson_and_Brown evolutionary approach requires the parameter 'checkpoint', a path to a trained latent embedding model.")
 
-    name = f"{FLAGS.strategy}_{FLAGS.type}_{gen}_{pop}_{int(time.time())}"
+    name = f"{FLAGS.strategy}_concat{FLAGS.concat}_{FLAGS.type}_g{gen}_p{pop}_t{int(time.time())}"
 
     # Human-in-the-loop Training
     try:
-        evolve_and_cluster(name, FLAGS.type, FLAGS.checkpoint, gen, pop, cr, mr, FLAGS.k, FLAGS.seed, FLAGS.agents, FLAGS.lifespan, heterogeneous=heterogeneous)
+        evolve_and_cluster(name, FLAGS.type, FLAGS.checkpoint, gen, pop, cr, mr, FLAGS.k, FLAGS.seed, FLAGS.agents, FLAGS.lifespan, heterogeneous=heterogeneous, concat=FLAGS.concat, export_medoids=FLAGS.exp_medoids)
     except Exception as e:
         logging.warning("Exception Raised in Evolution. Evolution and Clustering Terminated.")
         raise e
