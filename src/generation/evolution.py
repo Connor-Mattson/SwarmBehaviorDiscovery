@@ -44,8 +44,9 @@ class ModifiedHaltingEvolution(HaltedEvolution):
                  world: RectangularWorldConfig,
                  output_config: OutputTensorConfig,
                  evolution_config: GeneticEvolutionConfig,
-                 screen=None):
-        super().__init__(world, output_config, evolution_config, screen)
+                 screen=None,
+                 heterogeneous=False):
+        super().__init__(world, output_config, evolution_config, screen, heterogeneous=heterogeneous)
         self.archive = ModifiedNoveltyArchieve()
 
     def restart_screen(self):
@@ -66,7 +67,8 @@ class ModifiedHaltingEvolution(HaltedEvolution):
             i=self.behavior_discovery.curr_genome,
             seed=self.world.seed,
             output_config=self.output_configuration,
-            save=False
+            save=False,
+            heterogeneous=self.heterogeneous
         )
         genome = self.behavior_discovery.population[self.behavior_discovery.curr_genome]
 

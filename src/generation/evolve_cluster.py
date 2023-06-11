@@ -13,7 +13,7 @@ from src.hil.HIL import HIL
 import time
 from src.networks.ensemble import Ensemble
 from src.networks.network_wrapper import NetworkWrapper
-from src.constants import DEFAULT_OUTPUT_CONFIG, TWO_SENSOR_GENE_MODEL, SINGLE_SENSOR_GENE_MODEL, SINGLE_SENSOR_WORLD_CONFIG, TWO_SENSOR_WORLD_CONFIG
+from src.constants import DEFAULT_OUTPUT_CONFIG, TWO_SENSOR_GENE_MODEL, SINGLE_SENSOR_GENE_MODEL, SINGLE_SENSOR_WORLD_CONFIG, TWO_SENSOR_WORLD_CONFIG, SINGLE_SENSOR_HETEROGENEOUS_MODEL, SINGLE_SENSOR_HETEROGENEOUS_WORLD_CONFIG
 from novel_swarms.config.EvolutionaryConfig import GeneticEvolutionConfig
 from novel_swarms.config.defaults import ConfigurationDefaults
 
@@ -104,7 +104,8 @@ def execute_from_model(MODEL):
     evolution = ModifiedHaltingEvolution(
         evolution_config=MODEL["g_e"],
         world=MODEL["g_e"].world_config,
-        output_config=DEFAULT_OUTPUT_CONFIG
+        output_config=DEFAULT_OUTPUT_CONFIG,
+        heterogeneous=MODEL["heterogeneous"]
     )
     evolution.restart_screen()
 
@@ -134,12 +135,21 @@ def execute_from_model(MODEL):
 
 
 def evolve_and_cluster(name, _type, network=None, gen=100, pop=100, cr=0.7, mr=0.15, k=12, seed=None, agents=24,
-                       lifespan=1200):
-    world = TWO_SENSOR_WORLD_CONFIG if _type == "two-sensor" else SINGLE_SENSOR_WORLD_CONFIG
+                       lifespan=1200, heterogeneous=False):
+
+    gene_builder = None
+    if heterogeneous:
+        gene_builder = SINGLE_SENSOR_HETEROGENEOUS_MODEL
+        world = SINGLE_SENSOR_HETEROGENEOUS_WORLD_CONFIG
+    else:
+        gene_builder = TWO_SENSOR_GENE_MODEL if _type == "two-sensor" else SINGLE_SENSOR_GENE_MODEL
+        world = TWO_SENSOR_WORLD_CONFIG if _type == "two-sensor" else SINGLE_SENSOR_WORLD_CONFIG
+
     world.population_size = agents
     model = {
         "out_name": name,
         "network": network,
+        "heterogeneous": heterogeneous,
         "config": {
             "generations": gen,
             "population": pop,
@@ -150,9 +160,9 @@ def evolve_and_cluster(name, _type, network=None, gen=100, pop=100, cr=0.7, mr=0
             "crossover_rate": cr,
             "mutation_rate": mr,
         },
-        "concat" : False,
+        "concat": False,
         "g_e": GeneticEvolutionConfig(
-            gene_builder=TWO_SENSOR_GENE_MODEL if _type == "two-sensor" else SINGLE_SENSOR_GENE_MODEL,
+            gene_builder=gene_builder,
             phenotype_config=ConfigurationDefaults.BEHAVIOR_VECTOR,
             n_generations=gen,
             n_population=pop,

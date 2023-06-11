@@ -72,7 +72,7 @@ TWO_SENSOR_GENE_MODEL = GeneBuilder(
 
 # Note: Not Immutable
 SINGLE_SENSOR_HETEROGENEOUS_MODEL = GeneBuilder(
-    round_to_digits=1,
+    round_to_digits=None,
     rules=[
         GeneRule(discrete_domain=[i / 10 for i in range(-10, 11, 1)], step_size=4, allow_mutation=True),
         GeneRule(discrete_domain=[i / 10 for i in range(-10, 11, 1)], step_size=4, allow_mutation=True),
@@ -82,7 +82,7 @@ SINGLE_SENSOR_HETEROGENEOUS_MODEL = GeneBuilder(
         GeneRule(discrete_domain=[i / 10 for i in range(-10, 11, 1)], step_size=4, allow_mutation=True),
         GeneRule(discrete_domain=[i / 10 for i in range(-10, 11, 1)], step_size=4, allow_mutation=True),
         GeneRule(discrete_domain=[i / 10 for i in range(-10, 11, 1)], step_size=4, allow_mutation=True),
-        GeneRule(discrete_domain=[1.0 / (n + 1) for n in range(1, 5, 1)], step_size=2, allow_mutation=True)
+        GeneRule(discrete_domain=[0.5, 0.33, 0.25, 0.1, 0.01], step_size=2, allow_mutation=True)
     ]
 )
 
@@ -117,12 +117,7 @@ SINGLE_SENSOR_WORLD_CONFIG = RectangularWorldConfig(
     padding=15
 )
 
-SINGLE_SENSOR_HETEROGENEOUS_WORLD_CONFIG = RectangularWorldConfig(
-    size=(500, 500),
-    behavior=ConfigurationDefaults.BEHAVIOR_VECTOR,
-    agentConfig=SINGLE_SENSOR_AGENT_CONFIG,
-    padding=15
-)
+
 
 HETEROGENEOUS_SUBGROUP_BEHAVIOR = [
     SubGroupBehavior(AverageSpeedBehavior(), subgroup=0),
@@ -136,3 +131,23 @@ HETEROGENEOUS_SUBGROUP_BEHAVIOR = [
     SubGroupBehavior(ScatterBehavior(), subgroup=1),
     SubGroupBehavior(GroupRotationBehavior(), subgroup=1),
 ]
+
+
+def SINGLE_SENSOR_HETERO_AGENT_CONFIG():
+    from novel_swarms.config.HeterogenSwarmConfig import HeterogeneousSwarmConfig
+    agent_A = DiffDriveAgentConfig(controller=None, sensors=SINGLE_SENSOR_SET, dt=1.0,
+                                   body_color=(255, 0, 0))
+    agent_B = DiffDriveAgentConfig(controller=None, sensors=SINGLE_SENSOR_SET, dt=1.0,
+                                   body_color=(0, 255, 0))
+    h_config = HeterogeneousSwarmConfig()
+    h_config.add_sub_populuation(agent_A, 1)
+    h_config.add_sub_populuation(agent_B, 1)
+    return h_config
+
+
+SINGLE_SENSOR_HETEROGENEOUS_WORLD_CONFIG = RectangularWorldConfig(
+    size=(500, 500),
+    behavior=ConfigurationDefaults.BEHAVIOR_VECTOR,
+    agentConfig=SINGLE_SENSOR_HETERO_AGENT_CONFIG(),
+    padding=15
+)
