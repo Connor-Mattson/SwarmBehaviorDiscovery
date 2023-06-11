@@ -105,7 +105,7 @@ def execute_from_model(MODEL):
         evolution_config=MODEL["g_e"],
         world=MODEL["g_e"].world_config,
         output_config=DEFAULT_OUTPUT_CONFIG,
-        heterogeneous=MODEL["heterogeneous"]
+        heterogeneous=MODEL["heterogeneous"],
     )
     evolution.restart_screen()
 
@@ -136,7 +136,7 @@ def execute_from_model(MODEL):
 
 
 def evolve_and_cluster(name, _type, network=None, gen=100, pop=100, cr=0.7, mr=0.15, k=12, seed=None, agents=24,
-                       lifespan=1200, heterogeneous=False, concat=False, export_medoids=False):
+                       lifespan=1200, heterogeneous=False, concat=False, export_medoids=False, evaluate_sub_groups=False):
 
     gene_builder = None
     if heterogeneous:
@@ -147,7 +147,7 @@ def evolve_and_cluster(name, _type, network=None, gen=100, pop=100, cr=0.7, mr=0
         world = TWO_SENSOR_WORLD_CONFIG if _type == "two-sensor" else SINGLE_SENSOR_WORLD_CONFIG
 
     world.population_size = agents
-    world.behavior = ConfigurationDefaults.BEHAVIOR_VECTOR if not concat else HETEROGENEOUS_SUBGROUP_BEHAVIOR
+    world.behavior = ConfigurationDefaults.BEHAVIOR_VECTOR if not evaluate_sub_groups else HETEROGENEOUS_SUBGROUP_BEHAVIOR
     model = {
         "out_name": name,
         "network": network,
@@ -164,6 +164,7 @@ def evolve_and_cluster(name, _type, network=None, gen=100, pop=100, cr=0.7, mr=0
         },
         "concat": concat,
         "export_medoids": export_medoids,
+        "evaluate_sub_groups": evaluate_sub_groups,
         "g_e": GeneticEvolutionConfig(
             gene_builder=gene_builder,
             phenotype_config=ConfigurationDefaults.BEHAVIOR_VECTOR if not concat else HETEROGENEOUS_SUBGROUP_BEHAVIOR,
