@@ -53,7 +53,8 @@ class ModifiedHaltingEvolution(HaltedEvolution):
         pygame.init()
         pygame.display.set_caption("Evolutionary Novelty Search")
         screen = pygame.display.set_mode((self.world.w, self.world.h))
-        self.output_configuration.screen = screen
+        if self.output_configuration is not None:
+            self.output_configuration.screen = screen
 
     def next(self):
         output, behavior = self.behavior_discovery.runSinglePopulation(
