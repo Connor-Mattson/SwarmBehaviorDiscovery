@@ -53,13 +53,7 @@ class ModifiedHaltingEvolution(HaltedEvolution):
         pygame.init()
         pygame.display.set_caption("Evolutionary Novelty Search")
         screen = pygame.display.set_mode((self.world.w, self.world.h))
-
-        self.output_configuration = OutputTensorConfig(
-            timeless=True,
-            total_frames=80,
-            steps_between_frames=2,
-            screen=screen
-        )
+        self.output_configuration.screen = screen
 
     def next(self):
         output, behavior = self.behavior_discovery.runSinglePopulation(
@@ -95,11 +89,16 @@ class ModifiedHaltingEvolution(HaltedEvolution):
             self.behavior_discovery.archive.setRandoms(randoms)
 
     def evolve(self):
+        print(f"Calculating Scores for archive of size {len(self.behavior_discovery.archive.archive)}...")
+
         self.behavior_discovery.curr_genome = 0
         self.behavior_discovery.evaluate()
 
-        print(self.archive.__class__)
+        # print(self.archive.__class__)
+        print("=" * 30)
+        print("Novelty Scores:")
         print(self.behavior_discovery.scores)
+        print("=" * 30)
 
         self.behavior_discovery.evolve()
 

@@ -159,6 +159,38 @@ class NetworkWrapper:
             else:
                 self.scheduler.step()
 
+    def colored_input(self, image):
+        """
+        Embed the R,G channels of an image and then embed the entire image, concatenating the result into a vector of size 15.
+        :param image: A numpy 3-channel Image
+        :return: A vector of size 15 (First 5 values: R channel, Next 5 values: G channel, Last 5 values: Combined R+G channels)
+        """
+        NOISE = 100
+        reduced_noise_r = image[:, :, 0]
+        reduced_noise_g = image[:, :, 1]
+
+        reduced_noise_r[reduced_noise_r < NOISE] = 0
+        reduced_noise_g[reduced_noise_g < NOISE] = 0
+
+        extracted_r = np.expand_dims(reduced_noise_r, axis=2)
+        extracted_g = np.expand_dims(reduced_noise_g, axis=2)
+        combined_r_g = np.bitwise_or(extracted_r, extracted_g)
+
+        extracted_r = np.reshape(extracted_r, (1, 50, 50))
+        extracted_g = np.reshape(extracted_g, (1, 50, 50))
+        combined_r_g = np.reshape(combined_r_g, (1, 50, 50))
+
+        r_image = np.expand_dims(extracted_r, axis=0)
+        g_image = np.expand_dims(extracted_g, axis=0)
+        c_image = np.expand_dims(combined_r_g, axis=0)
+
+        r_embed = self.batch_out(r_image).detach().cpu().squeeze(dim=0).numpy()
+        g_embed = self.batch_out(g_image).detach().cpu().squeeze(dim=0).numpy()
+        c_embed = self.batch_out(c_image).detach().cpu().squeeze(dim=0).numpy()
+
+        ret = np.concatenate((r_embed, g_embed, c_embed))
+        return ret
+
     # def evaluate_lr(self, losses):
     #     if self.schedulers:
     #         self.last_losses = self.losses

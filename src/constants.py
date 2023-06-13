@@ -82,7 +82,7 @@ SINGLE_SENSOR_HETEROGENEOUS_MODEL = GeneBuilder(
         GeneRule(discrete_domain=[i / 10 for i in range(-10, 11, 1)], step_size=4, allow_mutation=True),
         GeneRule(discrete_domain=[i / 10 for i in range(-10, 11, 1)], step_size=4, allow_mutation=True),
         GeneRule(discrete_domain=[i / 10 for i in range(-10, 11, 1)], step_size=4, allow_mutation=True),
-        GeneRule(discrete_domain=[0.5, 0.33, 0.25, 0.1, 0.01], step_size=2, allow_mutation=True)
+        GeneRule(discrete_domain=[(12 / 24), (8 / 24), (6 / 24), (3 / 24), (1 / 24)], step_size=2, allow_mutation=True)
     ]
 )
 
@@ -117,8 +117,6 @@ SINGLE_SENSOR_WORLD_CONFIG = RectangularWorldConfig(
     padding=15
 )
 
-
-
 HETEROGENEOUS_SUBGROUP_BEHAVIOR = [
     SubGroupBehavior(AverageSpeedBehavior(), subgroup=0),
     SubGroupBehavior(AngularMomentumBehavior(), subgroup=0),
@@ -130,6 +128,11 @@ HETEROGENEOUS_SUBGROUP_BEHAVIOR = [
     SubGroupBehavior(RadialVarianceBehavior(), subgroup=1),
     SubGroupBehavior(ScatterBehavior(), subgroup=1),
     SubGroupBehavior(GroupRotationBehavior(), subgroup=1),
+    AverageSpeedBehavior(),
+    AngularMomentumBehavior(),
+    RadialVarianceBehavior(),
+    ScatterBehavior(),
+    GroupRotationBehavior(),
 ]
 
 
@@ -140,8 +143,8 @@ def SINGLE_SENSOR_HETERO_AGENT_CONFIG():
     agent_B = DiffDriveAgentConfig(controller=None, sensors=SINGLE_SENSOR_SET, dt=1.0,
                                    body_color=(0, 255, 0))
     h_config = HeterogeneousSwarmConfig()
-    h_config.add_sub_populuation(agent_A, 1)
-    h_config.add_sub_populuation(agent_B, 1)
+    h_config.add_sub_populuation(agent_A, 1)  # 1 will be intentionally overwritten by controller
+    h_config.add_sub_populuation(agent_B, 1)  # 1 will be intentionally overwritten by controller
     return h_config
 
 
