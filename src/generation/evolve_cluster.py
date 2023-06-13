@@ -147,7 +147,6 @@ def execute_from_model(MODEL):
                                   concat_behavior=True if MODEL["checkpoint"] and MODEL["concat"] else False,
                                   strategy=MODEL["strategy"], species_aware=MODEL["evaluate_sub_groups"])
 
-            print(embedding)
             evolution.behavior_discovery.archive.addToArchive(embedding, genome)
 
 
