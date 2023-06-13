@@ -19,7 +19,8 @@ ROBOT_TYPES = frozenset([
 
 STRATEGY_TYPES = frozenset([
     "Mattson_and_Brown",
-    "Brown_et_al"
+    "Brown_et_al",
+    "ResNet"
 ])
 
 MINING_TYPES = frozenset([

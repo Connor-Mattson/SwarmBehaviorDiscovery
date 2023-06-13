@@ -2,9 +2,12 @@ import random
 import torch
 import os
 import numpy as np
+import cv2
 from src.networks.embedding import NoveltyEmbedding
 from scipy import ndimage
 from src.networks.lars import LARS
+from torchvision import models
+
 
 def init_weights_randomly(m):
     if isinstance(m, torch.nn.Linear):
@@ -212,3 +215,35 @@ class NetworkWrapper:
 
     def get_lr(self):
         return self.scheduler.optimizer.param_groups[0]['lr']
+
+
+class ResNetWrapper(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        resnet = models.resnet18(pretrained=True)
+        num_ftrs = resnet.fc.in_features
+        layers_ = list(resnet.children())[:-1]
+        self.resnet = torch.nn.Sequential(*layers_)
+        print(f"ResNet Init with {num_ftrs}")
+
+    def forward(self, x, greyscale=False):
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        x = x.astype(np.uint8)
+        x = cv2.resize(x, dsize=(200, 200), interpolation=cv2.INTER_AREA)
+        x = np.moveaxis(x, -1, 0)
+        x = torch.from_numpy(x).to(device).float()
+
+        if len(x.shape) == 3:
+            x = torch.unsqueeze(x, 0)
+        print(x.shape)
+        if greyscale:
+            x = x.repeat(1, 3, 1, 1).to(device)
+        batch_size, c, h, w = x.shape
+        print(f"Final Shape: {x.shape}")
+        feats = self.resnet(x)
+        feats_flat = torch.flatten(feats, 1)
+        return feats_flat
+
+    def batch_out(self, data, greyscale=False):
+        return self.forward(data, greyscale)

@@ -12,7 +12,7 @@ from src.networks.archive import DataAggregationArchive
 from src.hil.HIL import HIL
 import time
 from src.networks.ensemble import Ensemble
-from src.networks.network_wrapper import NetworkWrapper
+from src.networks.network_wrapper import NetworkWrapper, ResNetWrapper
 from src.constants import DEFAULT_OUTPUT_CONFIG, TWO_SENSOR_GENE_MODEL, SINGLE_SENSOR_GENE_MODEL, SINGLE_SENSOR_WORLD_CONFIG, TWO_SENSOR_WORLD_CONFIG, SINGLE_SENSOR_HETEROGENEOUS_MODEL, SINGLE_SENSOR_HETEROGENEOUS_WORLD_CONFIG, HETEROGENEOUS_SUBGROUP_BEHAVIOR
 from novel_swarms.config.EvolutionaryConfig import GeneticEvolutionConfig
 from novel_swarms.config.defaults import ConfigurationDefaults
@@ -29,13 +29,18 @@ def embed(image, behavior, network, concat_behavior=False, size=50, strategy="Ma
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     embedding = None
     if network is not None:
-        network.network.eval()
         if strategy == "Mattson_and_Brown":
+            network.network.eval()
             if species_aware:
                 embedding = network.colored_input(image)
             else:
                 image = torch.from_numpy(image).to(device).float()
                 embedding = network.network(image.unsqueeze(0)).squeeze(0).cpu().detach().numpy()
+        if strategy == "ResNet":
+            if species_aware:
+                embedding = network.forward(image).detach().cpu().squeeze(dim=0).numpy()
+            else:
+                embedding = network.forward(image, greyscale=True).detach().cpu().squeeze(dim=0).numpy()
     else:
         embedding = behavior
 
@@ -103,6 +108,9 @@ def execute_from_model(MODEL):
         network.load_from_path(MODEL["checkpoint"])
         network.eval_mode()
         print(f"Network Loaded ==> {network.__class__}")
+    if MODEL["strategy"] == "ResNet":
+        network = ResNetWrapper()
+        network.to(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
     else:
         network = None
 
