@@ -19,7 +19,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import subprocess
 
-from src.generation.homogeneous_heuristic_filtering import HomogeneousFilter
+from src.generation.heuristic_filtering import ControllerFilter
 from src.ui.button import Button
 
 from novel_swarms.world.RectangularWorld import RectangularWorld
@@ -256,7 +256,7 @@ class GECCOBaselineImages:
         valid_rows = []
         for i, row in enumerate(labeled_controllers):
             controller = row[1:]
-            if HomogeneousFilter.filter(controller):
+            if ControllerFilter.homogeneous_filter(controller):
                 print(row)
                 valid_rows.append(row)
         filtered_controllers = pd.DataFrame(np.array(valid_rows))

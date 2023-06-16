@@ -280,5 +280,19 @@ def get_image_map(controller, representation, filepath=None, frame_start=1200, w
 
 
 if __name__ == '__main__':
-    get_image_map([-0.8979, -0.6356, 1.0000, -0.5669], "gif", filepath="/home/jeremy/Desktop/example.gif")
+    genomes = [
+        [-0.8, 0.7, -0.3, -0.7, -0.3, 0.8, -0.9, 0.1, 0.3333333333333333],
+        [-0.5, -0.9, 0.3, -0.4, 0.3, -1.0, 0.6, 0.6, 0.25],
+        [-1.0, -0.7, 0.1, 0.7, 0.6, -0.1, 0.4, 0.5, 0.3333333333333333],
+        [-0.6, -0.2, -1.0, 0.8, 1.0, -0.8, 1.0, 1.0, 0.125],
+        [1.0, -0.8, -0.4, 1.0, -0.9, -1.0, -0.6, 0.8, 0.25],
+        [0.5, 0.9, -0.7, -0.5, -0.9, 0.9, 1.0, 0.9, 0.5],
+        [-0.7, -0.5, 0.8, 0.5, 0.6, 0.7, -0.4, -0.5, 0.125],
+    ]
+    cluster_algo = "dbscan"
+    gif_dir = f"/home/jeremy/Desktop/clusters/{cluster_algo}/"
+    for i, genome in enumerate(genomes):
+        print(f"Saving image #{i+1}")
+        filepath = os.path.join(gif_dir, f"cluster-{i}.gif")
+        get_image_map(genome, "gif", filepath=filepath)
     print("Done")

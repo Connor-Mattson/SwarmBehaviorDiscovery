@@ -5,7 +5,7 @@ Filters out uninteresting homogeneous controllers.
 import numpy as np
 
 
-class HomogeneousFilter:
+class ControllerFilter:
 
     @staticmethod
     def _euclidean_distance(c1, c2):
@@ -38,22 +38,22 @@ class HomogeneousFilter:
         threshold = 0.2
         a, b, = controller[0], controller[1]
         mirror = [a, b, -a, -b]
-        return HomogeneousFilter._euclidean_distance(controller, mirror) < threshold
+        return ControllerFilter._euclidean_distance(controller, mirror) < threshold
 
     @staticmethod
     def _neglectful_distance_test(controller):
         threshold = 0.3
         a, b, = controller[0], controller[1]
         neglectful_controller = [a, b, a, b]
-        return HomogeneousFilter._euclidean_distance(controller, neglectful_controller) < threshold
+        return ControllerFilter._euclidean_distance(controller, neglectful_controller) < threshold
 
     @staticmethod
-    def filter(controller):
-        element_magnitude = HomogeneousFilter._element_magnitude_test(controller)
-        controller_magnitude = HomogeneousFilter._controller_magnitude_test(controller)
-        displacement = HomogeneousFilter._displacement_test(controller)
-        mirror_distance = HomogeneousFilter._mirror_distance_test(controller)
-        neglectful_distance = HomogeneousFilter._neglectful_distance_test(controller)
+    def homogeneous_filter(controller):
+        element_magnitude = ControllerFilter._element_magnitude_test(controller)
+        controller_magnitude = ControllerFilter._controller_magnitude_test(controller)
+        displacement = ControllerFilter._displacement_test(controller)
+        mirror_distance = ControllerFilter._mirror_distance_test(controller)
+        neglectful_distance = ControllerFilter._neglectful_distance_test(controller)
         return element_magnitude \
             and controller_magnitude \
             and displacement \

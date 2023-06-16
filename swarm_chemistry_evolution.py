@@ -2,17 +2,17 @@
 Implements the technique shown in Swarm Chemistry:
 https://direct.mit.edu/artl/article-abstract/15/1/105/2623/Swarm-Chemistry
 
-Human picks 1-2 out of 6 behaviors shown on a GUI.
+Human picks 1-2 out of 8 behaviors shown on a GUI.
 Behaviors are subsequently mutated and combined, or just mutated if only one is selected.
 In this case, the human acts as the fitness function, searching for novel/interesting behaviors.
 For instructions on how to operate this GUI, view `HIL-GUI-manual.pdf`
 
 Author: Jeremy Clark
 """
+
 import math
 import os.path
 import random
-
 import pandas as pd
 import pygame
 from collections import namedtuple, deque
@@ -140,11 +140,33 @@ class GUIUtils:
 
     @staticmethod
     def _heterogeneous_crossover(c1, c2):
+        """
+        Performs crossover on heterogeneous controllers (those with 9 elements).
+        Randomly picks a 'target' controller.
+        The ratio value (the first value) of the target controller will remain constant.
+        Randomly chooses whether to perform crossover on the first or second subspecies of the controller.
+        Keeps the other subspecies in the target controller constant.
+
+        The rationale for this approach is that if a heterogeneous genotype has an interesting phenotype,
+        the sub-species of that genotype are probably interesting as well, and should be relatively well-preserved.
+        :param c1:
+        :param c2:
+        :return:
+        """
+        # Pick which controller is the target and which is the supplement
         target_controller = deepcopy(c1) if random.random() > 0.5 else deepcopy(c2)
         supplement_controller = deepcopy(c2) if target_controller == c1 else deepcopy(c1)
+
+        # Mutate both controllers
+        target_controller = GUIUtils._mutate_controller(target_controller)
+        supplement_controller = GUIUtils._mutate_controller(supplement_controller)
+
+        # Pick subspecies to perform crossover on
         beg_index = 1 if random.random() > 0.5 else 5
         supplement_subspecies = supplement_controller[beg_index:beg_index+4]
         target_subspecies = target_controller[beg_index:beg_index+4]
+
+        # Perform crossover on that subspecies of the target controller, return
         cross_index = math.floor(random.random() * 4)
         supplement_subspecies[cross_index] = target_subspecies[cross_index]
         target_controller[beg_index:beg_index+4] = supplement_subspecies
@@ -220,14 +242,18 @@ class GUIUtils:
         return [round(n, 2) for n in controller]
 
     @staticmethod
-    def generate_random_controllers(num=8, length=9):
+    def generate_random_controllers(num=8, length=9, seed=None):
         """
         Generates `num` random controllers of length `length`
 
         :param num: The number of controllers to generate
         :param length: The length of each controller
+        :param seed: Random seed, if any
         :return: A list of randomly generated controllers
         """
+        # If we want the function to be deterministic, then seed the random number algorithm
+        if seed is not None:
+            random.seed(seed)
         controller_list = []
         for _ in range(num):
             controller = [random.uniform(-1, 1) for _ in range(length)]
@@ -251,12 +277,14 @@ class HILGUI:
             time_limit=None,  # The maximum amount of time the user may use.
             click_limit=None,  # The maximum number of steps forward or backward a generation that a user may make.
             save_archived_controllers=False,  # Whether we should save the controllers in the archive as GIFs
+            seed=None
     ):
         self.heterogeneous = heterogeneous
         self.steps_per_frame = steps_per_frame
         self.time_limit = time_limit
         self.click_limit = click_limit
         self.save_archived_controllers = save_archived_controllers
+        self.seed = seed
 
         pygame.init()
         self.timesteps = 0  # How many timesteps the current generation has taken
@@ -453,6 +481,10 @@ class HILGUI:
         """
         Driver function for program execution.
         """
+        # Ensure that the first set of choices is always the same for every user
+        random_controllers = GUIUtils.generate_random_controllers(seed=self.seed)
+        self.controller_history.append(random_controllers)
+
         while True:
             # Handle limit breaching
             if self.click_limit is not None and self.number_of_clicks >= self.click_limit:
@@ -687,11 +719,13 @@ def render_interesting_worlds():
         gif_filename = f"{controller}.gif"
         gif_filepath = os.path.join(interesting_behaviors_dirpath, gif_filename)
         world = RectangularWorld(GUIUtils.generate_heterogeneous_world_config(controller))
-        for _ in range(1200):
+        for _ in range(2300):
             world.step()
         get_gif_representation(world, gif_filepath, steps=1000)
 
 
 if __name__ == '__main__':
-    gui = HILGUI(heterogeneous=True, save_archived_controllers=True)
-    gui.run()
+    # gui = HILGUI(heterogeneous=True, save_archived_controllers=True, seed=2)
+    # gui.run()
+    # REMEMBER TO CLEAR
+    render_interesting_worlds()
