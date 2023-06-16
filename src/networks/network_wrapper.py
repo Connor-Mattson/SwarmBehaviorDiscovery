@@ -128,8 +128,9 @@ class NetworkWrapper:
 
     def load(self, in_folder, name):
         _dir = in_folder
-        checkpoint = torch.load(os.path.join(_dir, f"{name}.pt"))
+        checkpoint = torch.load(os.path.join(_dir, f"{name}.pt"), map_location=self.device)
         self.network.load_state_dict(checkpoint["model_state_dict"])
+        self.network = self.network.to(self.device)
 
     def load_from_path(self, path):
         checkpoint = torch.load(path)
