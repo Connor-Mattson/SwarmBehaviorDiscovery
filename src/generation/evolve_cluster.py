@@ -13,7 +13,8 @@ from src.hil.HIL import HIL
 import time
 from src.networks.ensemble import Ensemble
 from src.networks.network_wrapper import NetworkWrapper, ResNetWrapper
-from src.constants import DEFAULT_OUTPUT_CONFIG, TWO_SENSOR_GENE_MODEL, SINGLE_SENSOR_GENE_MODEL, SINGLE_SENSOR_WORLD_CONFIG, TWO_SENSOR_WORLD_CONFIG, SINGLE_SENSOR_HETEROGENEOUS_MODEL, SINGLE_SENSOR_HETEROGENEOUS_WORLD_CONFIG, HETEROGENEOUS_SUBGROUP_BEHAVIOR
+from src.constants import DEFAULT_OUTPUT_CONFIG, TWO_SENSOR_GENE_MODEL, SINGLE_SENSOR_GENE_MODEL, SINGLE_SENSOR_WORLD_CONFIG, TWO_SENSOR_WORLD_CONFIG, \
+    SINGLE_SENSOR_HETEROGENEOUS_MODEL, SINGLE_SENSOR_HETEROGENEOUS_WORLD_CONFIG_AGNOSTIC, SINGLE_SENSOR_HETEROGENEOUS_WORLD_CONFIG_AWARE, HETEROGENEOUS_SUBGROUP_BEHAVIOR
 from novel_swarms.config.EvolutionaryConfig import GeneticEvolutionConfig
 from novel_swarms.config.defaults import ConfigurationDefaults
 
@@ -34,6 +35,7 @@ def embed(image, behavior, network, concat_behavior=False, size=50, strategy="Ma
             if species_aware:
                 embedding = network.colored_input(image)
             else:
+                print(image.shape)
                 image = torch.from_numpy(image).to(device).float()
                 embedding = network.network(image.unsqueeze(0)).squeeze(0).cpu().detach().numpy()
         if strategy == "ResNet":
@@ -47,6 +49,7 @@ def embed(image, behavior, network, concat_behavior=False, size=50, strategy="Ma
     if concat_behavior:
         embedding = np.concatenate((embedding, behavior))
 
+    print(f"Embedding: {embedding}")
     return embedding
 
 def getEmbeddedArchive(dataset, network, concat_behavior=False, size=50, strategy="Mattson_and_Brown", species_aware=False):
@@ -108,7 +111,7 @@ def execute_from_model(MODEL):
         network.load_from_path(MODEL["checkpoint"])
         network.eval_mode()
         print(f"Network Loaded ==> {network.__class__}")
-    if MODEL["strategy"] == "ResNet":
+    elif MODEL["strategy"] == "ResNet":
         network = ResNetWrapper()
         network.to(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
     else:
@@ -179,7 +182,7 @@ def evolve_and_cluster(name, _type, checkpoint=None, gen=100, pop=100, cr=0.7, m
     gene_builder = None
     if heterogeneous:
         gene_builder = SINGLE_SENSOR_HETEROGENEOUS_MODEL
-        world = SINGLE_SENSOR_HETEROGENEOUS_WORLD_CONFIG
+        world = SINGLE_SENSOR_HETEROGENEOUS_WORLD_CONFIG_AWARE if evaluate_sub_groups else SINGLE_SENSOR_HETEROGENEOUS_WORLD_CONFIG_AGNOSTIC
     else:
         gene_builder = TWO_SENSOR_GENE_MODEL if _type == "two-sensor" else SINGLE_SENSOR_GENE_MODEL
         world = TWO_SENSOR_WORLD_CONFIG if _type == "two-sensor" else SINGLE_SENSOR_WORLD_CONFIG

@@ -137,21 +137,28 @@ HETEROGENEOUS_SUBGROUP_BEHAVIOR = [
 ]
 
 
-def SINGLE_SENSOR_HETERO_AGENT_CONFIG():
+def SINGLE_SENSOR_HETERO_AGENT_CONFIG(colored=False):
     from novel_swarms.config.HeterogenSwarmConfig import HeterogeneousSwarmConfig
     agent_A = DiffDriveAgentConfig(controller=None, sensors=SINGLE_SENSOR_SET, dt=1.0,
-                                   body_color=(255, 0, 0))
+                                   body_color=(255, 0, 0) if colored else (255, 255, 255))
     agent_B = DiffDriveAgentConfig(controller=None, sensors=SINGLE_SENSOR_SET, dt=1.0,
-                                   body_color=(0, 255, 0))
+                                   body_color=(0, 255, 0) if colored else (255, 255, 255))
     h_config = HeterogeneousSwarmConfig()
     h_config.add_sub_populuation(agent_A, 1)  # 1 will be intentionally overwritten by controller
     h_config.add_sub_populuation(agent_B, 1)  # 1 will be intentionally overwritten by controller
     return h_config
 
 
-SINGLE_SENSOR_HETEROGENEOUS_WORLD_CONFIG = RectangularWorldConfig(
+SINGLE_SENSOR_HETEROGENEOUS_WORLD_CONFIG_AGNOSTIC = RectangularWorldConfig(
     size=(500, 500),
     behavior=ConfigurationDefaults.BEHAVIOR_VECTOR,
-    agentConfig=SINGLE_SENSOR_HETERO_AGENT_CONFIG(),
+    agentConfig=SINGLE_SENSOR_HETERO_AGENT_CONFIG(colored=False),
+    padding=15
+)
+
+SINGLE_SENSOR_HETEROGENEOUS_WORLD_CONFIG_AWARE = RectangularWorldConfig(
+    size=(500, 500),
+    behavior=ConfigurationDefaults.BEHAVIOR_VECTOR,
+    agentConfig=SINGLE_SENSOR_HETERO_AGENT_CONFIG(colored=True),
     padding=15
 )
