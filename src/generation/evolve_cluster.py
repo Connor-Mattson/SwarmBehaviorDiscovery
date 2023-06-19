@@ -35,7 +35,6 @@ def embed(image, behavior, network, concat_behavior=False, size=50, strategy="Ma
             if species_aware:
                 embedding = network.colored_input(image)
             else:
-                print(image.shape)
                 image = torch.from_numpy(image).to(device).float()
                 embedding = network.network(image.unsqueeze(0)).squeeze(0).cpu().detach().numpy()
         if strategy == "ResNet":
@@ -49,7 +48,6 @@ def embed(image, behavior, network, concat_behavior=False, size=50, strategy="Ma
     if concat_behavior:
         embedding = np.concatenate((embedding, behavior))
 
-    print(f"Embedding: {embedding}")
     return embedding
 
 def getEmbeddedArchive(dataset, network, concat_behavior=False, size=50, strategy="Mattson_and_Brown", species_aware=False):
