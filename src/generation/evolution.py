@@ -70,6 +70,20 @@ class ModifiedHaltingEvolution(HaltedEvolution):
         self.behavior_discovery.curr_genome += 1
         return output, genome, behavior
 
+    def simulate_specific(self, genome):
+        output, behavior = self.behavior_discovery.runSinglePopulation(
+            screen=None,
+            i=self.behavior_discovery.curr_genome,
+            genome=genome,
+            seed=self.world.seed,
+            output_config=self.output_configuration,
+            save=False,
+            heterogeneous=self.heterogeneous
+        )
+        genome = self.behavior_discovery.population[self.behavior_discovery.curr_genome]
+        # self.behavior_discovery.curr_genome += 1
+        return output, genome, behavior
+
     def miniNext(self):
         img, genome, behavior = self.next()
         img = self.resize(img)

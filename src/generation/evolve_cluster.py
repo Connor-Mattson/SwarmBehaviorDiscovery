@@ -208,6 +208,7 @@ def evolve_and_cluster(name, _type, checkpoint=None, gen=100, pop=100, cr=0.7, m
         "evaluate_sub_groups": evaluate_sub_groups,
         "g_e": GeneticEvolutionConfig(
             gene_builder=gene_builder,
+            # Potentially Remove this
             phenotype_config=ConfigurationDefaults.BEHAVIOR_VECTOR if not concat else HETEROGENEOUS_SUBGROUP_BEHAVIOR,
             n_generations=gen,
             n_population=pop,
