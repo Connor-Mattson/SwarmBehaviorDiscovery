@@ -23,7 +23,7 @@ import csv
 import gc
 
 from src.ui.button import Button
-from data.img_process import get_gif_representation
+from src.ui.img_process import get_gif_representation
 from novel_swarms.config.AgentConfig import DiffDriveAgentConfig
 from novel_swarms.config.AgentConfig import DroneAgentConfig
 from novel_swarms.config.AgentConfig import UnicycleAgentConfig
@@ -727,5 +727,6 @@ def render_interesting_worlds():
 if __name__ == '__main__':
     # gui = HILGUI(heterogeneous=True, save_archived_controllers=True, seed=2)
     # gui.run()
+    update_manual_pdf()
     # REMEMBER TO CLEAR
-    render_interesting_worlds()
+    # render_interesting_worlds()

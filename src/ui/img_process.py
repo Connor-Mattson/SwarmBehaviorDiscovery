@@ -262,8 +262,8 @@ def get_image_map(controller, representation, filepath=None, frame_start=1200, w
     if world is None:
         config = generate_world_config(controller)
         world = RectangularWorld(config)
-        for _ in range(frame_start):
-            world.step()
+    for _ in range(frame_start):
+        world.step()
 
     # If were saving as a GIF, call get_gif_representation immediately because the process for handling output differs
     if representation == "gif":
@@ -293,6 +293,6 @@ if __name__ == '__main__':
     gif_dir = f"/home/jeremy/Desktop/clusters/{cluster_algo}/"
     for i, genome in enumerate(genomes):
         print(f"Saving image #{i+1}")
-        filepath = os.path.join(gif_dir, f"cluster-{i}.gif")
-        get_image_map(genome, "gif", filepath=filepath)
+        path = os.path.join(gif_dir, f"cluster-{i}.gif")
+        get_image_map(genome, "gif", filepath=path)
     print("Done")

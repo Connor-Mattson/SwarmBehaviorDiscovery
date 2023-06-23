@@ -23,7 +23,7 @@ from src.generation.heuristic_filtering import ControllerFilter
 from src.ui.button import Button
 
 from novel_swarms.world.RectangularWorld import RectangularWorld
-from data.img_process import get_image_map, generate_world_config
+from src.ui.img_process import get_image_map, generate_world_config
 
 # How many images should we collect for training
 sample_size = 10
