@@ -2,9 +2,12 @@ import random
 import torch
 import os
 import numpy as np
+import cv2
 from src.networks.embedding import NoveltyEmbedding
 from scipy import ndimage
 from src.networks.lars import LARS
+from torchvision import models
+
 
 def init_weights_randomly(m):
     if isinstance(m, torch.nn.Linear):
@@ -25,16 +28,26 @@ class NetworkWrapper:
                  total_epochs=100,
                  warmup=10,
                  dynamic_lr=False,
+                 network=None,
+                 only_features=False,
                 ):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.network = NoveltyEmbedding(out_size=output_size, new_model=new_model).to(self.device)
+
+        if network is None:
+            self.network = NoveltyEmbedding(out_size=output_size, new_model=new_model).to(self.device)
+        else:
+            self.network = network.to(self.device)
+
         self.lr = lr
-        self.optimizer = torch.optim.Adam(self.network.parameters(), lr=self.lr, eps=1e-6)
+        self.only_features = only_features
+        self.create_optimizer()
+
         self.dynamic_lr = dynamic_lr
 
         if manual_schedulers:
             if dynamic_lr:
-                self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', min_lr=2e-3, factor=0.9, patience=15, verbose=True, threshold=5e-3)
+                # self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', min_lr=2e-4,factor=0.9, patience=15, verbose=True,threshold=5e-3)
+                self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', min_lr=2e-4, factor=0.75, patience=10, verbose=True, threshold=5e-3)
             else:
                 self.scheduler = torch.optim.lr_scheduler.ChainedScheduler([
                         torch.optim.lr_scheduler.LinearLR(self.optimizer, start_factor=0.01, total_iters=warmup),
@@ -115,12 +128,14 @@ class NetworkWrapper:
 
     def load(self, in_folder, name):
         _dir = in_folder
-        checkpoint = torch.load(os.path.join(_dir, f"{name}.pt"))
+        checkpoint = torch.load(os.path.join(_dir, f"{name}.pt"), map_location=self.device)
         self.network.load_state_dict(checkpoint["model_state_dict"])
+        self.network = self.network.to(self.device)
 
     def load_from_path(self, path):
-        checkpoint = torch.load(path)
+        checkpoint = torch.load(path, map_location=self.device)
         self.network.load_state_dict(checkpoint["model_state_dict"])
+        self.network = self.network.to(self.device)
 
     def save(self, out_folder, name):
         _dir = out_folder
@@ -136,12 +151,50 @@ class NetworkWrapper:
     def eval_mode(self):
         self.network.eval()
 
+    def create_optimizer(self, lr=None):
+        if self.only_features:
+            self.optimizer = torch.optim.Adam(self.network.encoder.parameters(), lr=self.lr if lr is None else lr, eps=1e-6)
+        else:
+            self.optimizer = torch.optim.Adam(self.network.parameters(), lr=self.lr if lr is None else lr, eps=1e-6)
+
     def step_scheduler(self, loss=None):
         if self.scheduler:
             if self.dynamic_lr and loss is not None:
                 self.scheduler.step(loss)
             else:
                 self.scheduler.step()
+
+    def colored_input(self, image):
+        """
+        Embed the R,G channels of an image and then embed the entire image, concatenating the result into a vector of size 15.
+        :param image: A numpy 3-channel Image
+        :return: A vector of size 15 (First 5 values: R channel, Next 5 values: G channel, Last 5 values: Combined R+G channels)
+        """
+        NOISE = 100
+        reduced_noise_r = image[:, :, 0]
+        reduced_noise_g = image[:, :, 1]
+
+        reduced_noise_r[reduced_noise_r < NOISE] = 0
+        reduced_noise_g[reduced_noise_g < NOISE] = 0
+
+        extracted_r = np.expand_dims(reduced_noise_r, axis=2)
+        extracted_g = np.expand_dims(reduced_noise_g, axis=2)
+        combined_r_g = np.bitwise_or(extracted_r, extracted_g)
+
+        extracted_r = np.reshape(extracted_r, (1, 50, 50))
+        extracted_g = np.reshape(extracted_g, (1, 50, 50))
+        combined_r_g = np.reshape(combined_r_g, (1, 50, 50))
+
+        r_image = np.expand_dims(extracted_r, axis=0)
+        g_image = np.expand_dims(extracted_g, axis=0)
+        c_image = np.expand_dims(combined_r_g, axis=0)
+
+        r_embed = self.batch_out(r_image).detach().cpu().squeeze(dim=0).numpy()
+        g_embed = self.batch_out(g_image).detach().cpu().squeeze(dim=0).numpy()
+        c_embed = self.batch_out(c_image).detach().cpu().squeeze(dim=0).numpy()
+
+        ret = np.concatenate((r_embed, g_embed, c_embed))
+        return ret
 
     # def evaluate_lr(self, losses):
     #     if self.schedulers:
@@ -159,8 +212,40 @@ class NetworkWrapper:
     #     return None
 
     def set_lr(self, lr, gamma):
-        self.optimizer = torch.optim.Adam(self.network.parameters(), lr=lr)
+        self.create_optimizer(lr)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.decay_step, gamma=gamma)
 
     def get_lr(self):
         return self.scheduler.optimizer.param_groups[0]['lr']
+
+
+class ResNetWrapper(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        resnet = models.resnet18(pretrained=True)
+        num_ftrs = resnet.fc.in_features
+        layers_ = list(resnet.children())[:-1]
+        self.resnet = torch.nn.Sequential(*layers_)
+        print(f"ResNet Init with {num_ftrs}")
+
+    def forward(self, x, greyscale=False):
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        x = x.astype(np.uint8)
+        x = cv2.resize(x, dsize=(200, 200), interpolation=cv2.INTER_AREA)
+        x = np.moveaxis(x, -1, 0)
+        x = torch.from_numpy(x).to(device).float()
+
+        if len(x.shape) == 3:
+            x = torch.unsqueeze(x, 0)
+        print(x.shape)
+        if greyscale:
+            x = x.repeat(1, 3, 1, 1).to(device)
+        batch_size, c, h, w = x.shape
+        print(f"Final Shape: {x.shape}")
+        feats = self.resnet(x)
+        feats_flat = torch.flatten(feats, 1)
+        return feats_flat
+
+    def batch_out(self, data, greyscale=False):
+        return self.forward(data, greyscale)
