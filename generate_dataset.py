@@ -7,16 +7,18 @@ from src.constants import ROBOT_TYPES
 from src.generation.create_dataset import create_dataset
 
 FLAGS = flags.FLAGS
+flags.DEFINE_integer("seed", 0, "Seed for Generation Evolution")
 flags.DEFINE_integer("size", 10000, "The number of simulated swarms in the dataset", lower_bound=0)
 flags.DEFINE_integer("lifespan", 1200, "The timestep horizon of the simulation", lower_bound=0)
 flags.DEFINE_integer("agents", 24, "Number of Agents", lower_bound=0, upper_bound=50)
 flags.DEFINE_enum("type", None, ROBOT_TYPES, "A specified Robot Capability Model")
 flags.DEFINE_bool("heuristic_filter", True, "Whether to explicitly filter out controllers that may be random or uninteresting")
+flags.DEFINE_bool("heterogeneous", False, "Whether to simulate multiple species of agents in the environment at once")
 flags.DEFINE_string("dataset_name", None, "A name that will be assigned to the output directory")
 
 def main(_):
     robot = FLAGS.type
-    experiment_name = f"{robot}-{int(time.time())}" if FLAGS.dataset_name is None else FLAGS.dataset_name
+    experiment_name = f"{robot}-{'homogeneous' if not FLAGS.heterogeneous else 'heterogeneous'}-{int(time.time())}-s{FLAGS.seed}" if FLAGS.dataset_name is None else FLAGS.dataset_name
     logging.info(f"Generating Swarm Trajectories for Robot Type \"{robot}\" in dir ./data/{experiment_name}")
 
     # Generate Data
@@ -26,7 +28,7 @@ def main(_):
         os.mkdir(export_to)
 
     try:
-        create_dataset(export_to, robot_type=robot, horizon=FLAGS.lifespan, n_agents=FLAGS.agents, filter=FLAGS.heuristic_filter, size=FLAGS.size)
+        create_dataset(export_to, robot_type=robot, horizon=FLAGS.lifespan, n_agents=FLAGS.agents, filter=FLAGS.heuristic_filter, size=FLAGS.size, heterogeneous=FLAGS.heterogeneous, seed=FLAGS.seed)
     except Exception as e:
         logging.warning("Exception Raised in Dataset Creation. Dataset Creation Terminated.")
         raise e
