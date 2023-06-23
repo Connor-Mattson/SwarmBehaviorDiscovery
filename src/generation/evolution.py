@@ -10,6 +10,7 @@ import cv2
 import pygame
 from sklearn.neighbors import NearestNeighbors
 
+
 class ModifiedNoveltyArchieve(NoveltyArchive):
     def __init__(self, max_size=None, pheno_file=None, geno_file=None):
         super().__init__(max_size, pheno_file, geno_file)

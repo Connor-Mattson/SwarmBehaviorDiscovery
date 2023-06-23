@@ -64,6 +64,7 @@ packaging==21.3
 pandas==2.0.1
 pandoc==2.3
 pandocfilters==1.5.0
+pandas==2.0.1
 parso==0.8.3
 pexpect==4.8.0
 pickleshare==0.7.5
@@ -127,3 +128,12 @@ wcwidth==0.2.5
 webencodings==0.5.1
 Werkzeug==2.2.2
 widgetsnbextension==4.0.3
+pandoc==2.3
+pypandoc~=1.11
+imageio~=2.30.0
+pyglet~=2.0.7
+PyYAML~=6.0
+Pympler~=1.0.1
+memory-profiler~=0.61.0
+objgraph~=3.5.0
+scalene~=1.5.21.4
