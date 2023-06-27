@@ -5,9 +5,11 @@ which generate and save image representations of a given controller.
 
 Author: Jeremy Clark
 """
+import copy
 import math
 import numpy as np
 from PIL import Image
+from novel_swarms.config.HeterogenSwarmConfig import HeterogeneousSwarmConfig
 from scipy.ndimage import gaussian_filter
 import pygame
 import imageio
@@ -183,10 +185,47 @@ def _evaluate_trails(world, world_dims=(500, 500), steps=100, skip=3):
     return output
 
 
+def generate_heterogeneous_world_config(controller):
+    """
+    Helper function for _generate_world_config
+
+    :param controller: The given 9-element long controller
+    :return: A world config for heterogeneous controllers
+    """
+    pop = 30  # Population of agents
+    rat = abs(controller[8])  # Ratio of agent 1 to agent 2
+    # Calculate populations of the two groups
+    p1 = math.floor(rat * pop)
+    p2 = pop - p1
+    # Controllers of the two groups are embedded in the parent controller
+    c1, c2 = controller[0:4], controller[4:8]
+    sensors = SensorSet([BinaryLOSSensor(angle=0)])
+    # sensors = SensorSet([BinaryFOVSensor(degrees=True, theta=15)])
+    a1_config = DiffDriveAgentConfig(controller=c1, sensors=sensors, seed=None, body_color=(200, 0, 0))
+    a2_config = DiffDriveAgentConfig(controller=c2, sensors=sensors, seed=None, body_color=(0, 200, 0))
+    agent_config = HeterogeneousSwarmConfig()
+    agent_config.add_sub_populuation(a1_config, p1)
+    agent_config.add_sub_populuation(a2_config, p2)
+    config = RectangularWorldConfig(
+        size=(500, 500),
+        n_agents=30,
+        seed=None,
+        behavior=[],
+        agentConfig=agent_config,
+        padding=15,
+        show_walls=True,
+        collide_walls=True
+    )
+    return config
+
+
 def generate_world_config(controller):
     """
     Generates a world configuration based on the given controller
     """
+    if len(controller) == 9:
+        return generate_heterogeneous_world_config(controller)
+
     sensors = SensorSet([BinaryLOSSensor(angle=0)])
     agent_config = DiffDriveAgentConfig(
         controller=controller,
@@ -262,8 +301,8 @@ def get_image_map(controller, representation, filepath=None, frame_start=1200, w
     if world is None:
         config = generate_world_config(controller)
         world = RectangularWorld(config)
-    for _ in range(frame_start):
-        world.step()
+        for _ in range(frame_start):
+            world.step()
 
     # If were saving as a GIF, call get_gif_representation immediately because the process for handling output differs
     if representation == "gif":
@@ -279,17 +318,37 @@ def get_image_map(controller, representation, filepath=None, frame_start=1200, w
         img.save(filepath)
 
 
+def get_selected_representations(controller, representations, filepaths, frame_start=3000):
+    world = RectangularWorld(generate_world_config(controller))
+    for _ in range(frame_start):
+        world.step()
+
+    for j in range(len(representations)):
+        representation = representations[j]
+        filepath = filepaths[j]
+        world_copy = copy.deepcopy(world)
+        get_image_map(controller, representation, filepath, world=world_copy)
+
+
 if __name__ == '__main__':
     genomes = [
-        [-0.8, 0.7, -0.3, -0.7, -0.3, 0.8, -0.9, 0.1, 0.3333333333333333],
-        [-0.5, -0.9, 0.3, -0.4, 0.3, -1.0, 0.6, 0.6, 0.25],
-        [-1.0, -0.7, 0.1, 0.7, 0.6, -0.1, 0.4, 0.5, 0.3333333333333333],
-        [-0.6, -0.2, -1.0, 0.8, 1.0, -0.8, 1.0, 1.0, 0.125],
-        [1.0, -0.8, -0.4, 1.0, -0.9, -1.0, -0.6, 0.8, 0.25],
-        [0.5, 0.9, -0.7, -0.5, -0.9, 0.9, 1.0, 0.9, 0.5],
-        [-0.7, -0.5, 0.8, 0.5, 0.6, 0.7, -0.4, -0.5, 0.125],
+        [0.6, 1.0, -0.9, 0.3, 1.0, 0.9, -0.1, 0.2, 0.125],
+        [0.8, 0.7, 0.5, 1.0, -0.8, 0.9, 0.6, 0.1, 0.25],
+        [-0.6, -0.9, 1.0, -0.7, 0.2, 1.0, 0.7, 0.3, 0.125],
+        [0.6, -1.0, -0.1, -1.0, 0.3, -0.2, 1.0, 1.0, 0.25],
+        [-0.8, -0.7, 0.5, -0.9, -0.8, -0.7, 0.6, 0.9, 0.25],
+        [0.2, 0.8, 0.3, -0.9, 0.2, 0.8, 0.3, -0.9, 0.3333333333333333],
+        [-0.6, -0.9, 0.8, -0.7, 0.9, -0.8, 0.6, 1.0, 0.3333333333333333],
+        [-1.0, -0.7, -0.8, 0.6, 0.4, 0.9, -0.7, -0.9, 0.25],
+        [0.4, -0.5, 0.9, -1.0, -0.9, 0.7, 0.6, 0.5, 0.25],
+        [-0.8, -0.9, -0.6, 0.6, -0.8, -0.8, -0.7, -0.8, 0.5],
+        [-1.0, -0.9, -0.5, -1.0, 0.3, -0.9, 0.5, 0.9, 0.25],
+        [-0.9, -1.0, -1.0, -0.8, 0.7, 0.9, 0.6, 0.9, 0.5],
+        [-0.8, -1.0, -1.0, -0.8, 0.9, 1.0, 0.9, 1.0, 0.3333333333333333],
+        [0.9, 1.0, 0.5, -0.9, 0.9, -0.6, 1.0, 0.7, 0.125],
+        [-0.4, -1.0, -1.0, 0.6, 0.9, -0.7, -0.4, -0.7, 0.041666666666666664],
     ]
-    cluster_algo = "dbscan"
+    cluster_algo = "spectral"
     gif_dir = f"/home/jeremy/Desktop/clusters/{cluster_algo}/"
     for i, genome in enumerate(genomes):
         print(f"Saving image #{i+1}")

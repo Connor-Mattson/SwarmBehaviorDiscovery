@@ -121,6 +121,32 @@ class GUIUtils:
         return x
 
     @staticmethod
+    def _get_next_ratio_increment(ratio):
+        """
+        Gets the next ratio increment for heterogeneous controller. Randomly decides between increasing or decreasing.
+
+        :param ratio: The ratio to be mutated
+        :return: A mutated ratio
+        """
+        ratios = [1/24, 3/24, 6/24, 8/24, 12/24]
+        index = 0
+        for i, r in enumerate(ratios):
+            if abs(r - ratio) < 0.01:
+                index = i
+
+        if random.random() > 0.5:
+            index += 1
+        else:
+            index -= 1
+
+        if index < 0:
+            index += 2
+        if index > 4:
+            index -= 2
+
+        return ratios[index]
+
+    @staticmethod
     def _mutate_controller(controller):
         """
         Returns a version of the controller with some random mutations, just like how in nature, offspring have
@@ -129,8 +155,13 @@ class GUIUtils:
         :param controller: The parent controller
         :return: A mutated version of the parent
         """
+        heterogeneous = len(controller) == 9
         mutated_controller = []
-        for e in controller:
+        for i, e in enumerate(controller):
+            if i == 0 and heterogeneous:
+                new_ratio = GUIUtils._get_next_ratio_increment(controller[0])
+                mutated_controller.append(new_ratio)
+                continue
             new_vel = e + GUIUtils._generate_normal()
             # Make sure the new velocity is between -1 and 1
             while not (-1 < new_vel < 1):
@@ -216,6 +247,7 @@ class GUIUtils:
         :param fit_controllers: The given controllers to make a new generation out of
         :return: A list of controllers representing the next generation in the evolution cycle
         """
+        heterogeneous = len(fit_controllers[0]) == 9
         new_generation = []
         # If the user has selected two controllers
         if len(fit_controllers) == 2:
@@ -224,14 +256,14 @@ class GUIUtils:
                 new_generation.append(GUIUtils._breed_controllers(c1, c2))
             new_generation.append(c1)
             new_generation.append(c2)
-            new_generation.append(GUIUtils.generate_random_controllers(1, len(c1))[0])
+            new_generation.append(GUIUtils.generate_random_controllers(1, heterogeneous=heterogeneous)[0])
         # Otherwise, the length of fit_controllers must be 1
         else:
             c = fit_controllers[0]
             for _ in range(6):
                 new_generation.append(GUIUtils._mutate_controller(c))
             new_generation.append(c)
-            new_generation.append(GUIUtils.generate_random_controllers(1, len(c))[0])
+            new_generation.append(GUIUtils.generate_random_controllers(1, heterogeneous=heterogeneous)[0])
         return new_generation
 
     @staticmethod
@@ -242,15 +274,16 @@ class GUIUtils:
         return [round(n, 2) for n in controller]
 
     @staticmethod
-    def generate_random_controllers(num=8, length=9, seed=None):
+    def generate_random_controllers(num=8, heterogeneous=True, seed=None):
         """
         Generates `num` random controllers of length `length`
 
+        :param heterogeneous: Whether the controller is heterogeneous
         :param num: The number of controllers to generate
-        :param length: The length of each controller
         :param seed: Random seed, if any
-        :return: A list of randomly generated controllers
+        :return: A list of randomly generated controllers. If the
         """
+        length = 9 if heterogeneous else 4
         # If we want the function to be deterministic, then seed the random number algorithm
         if seed is not None:
             random.seed(seed)
@@ -260,7 +293,12 @@ class GUIUtils:
             magnitudes = [abs(x) for x in controller]
             scaling_factor = 1 / max(magnitudes)
             normalized_controller = [scaling_factor * x for x in controller]
+            if heterogeneous:
+                ratios = [1 / 24, 3 / 24, 6 / 24, 8 / 24, 12 / 24]
+                index = math.floor(random.random() * 5)
+                normalized_controller[0] = ratios[index]
             controller_list.append(normalized_controller)
+        # Discretised ratio value
         return controller_list
 
 
@@ -306,18 +344,20 @@ class HILGUI:
         self.back_button = Button("Back", (60, 25), (5, 210), self.back, offset=stats_offset)
         self.running = True  # Whether the current generation is running
         self.cycle_output = None  # Collects output at the end of each generation for event handling
-        self.tiles = None  # A list of tile objects corresponding to this generation
+        self.tiles = []  # A list of tile objects corresponding to this generation
         # A stack where elements are lists of controllers. Top = current generation, bottom = first generation
         self.controller_history = deque()
         self.fit_controllers = []  # Controllers selected for evolution
         self.start_time = time.time()  # The time when the GUI was opened (seconds)
         self.number_of_clicks = 0  # How many times the user has gone forward or back
+        self.number_of_saves = 0  # How many times the user has saved a controller
         self.archived_controllers = []  # Controllers to be saved
         pygame.font.init()
         font = pygame.font.Font(None, 25)
         self.white_color = (255, 255, 255)
         self.generation_text = font.render(f"Current generation: {self.generation}", True, self.white_color)
         self.click_text = font.render(f"Number of clicks: {self.number_of_clicks}", True, self.white_color)
+        self.save_efficiency_text = font.render("No save efficiency yet.", True, self.white_color)
         del font
         pygame.font.quit()
 
@@ -394,6 +434,9 @@ class HILGUI:
         # TODO: Add placeholder zeroes
         return f"{int(hours)}:{int(minutes)}:{int(seconds)}"
 
+    def get_save_efficiency(self):
+        return round(self.number_of_saves / (self.number_of_clicks * 8), 4)
+
     def draw_stats_surface(self):
         """
         Helper function for drawing the main GUI. Draws the sidebar.
@@ -413,6 +456,8 @@ class HILGUI:
         self.stats_surface.blit(timestep_text, (text_x, text_y))
         text_y += 30
         self.stats_surface.blit(time_text, (text_x, text_y))
+        text_y += 30
+        self.stats_surface.blit(self.save_efficiency_text, (text_x, text_y))
 
         del timestep_text
         del time_text
@@ -482,7 +527,7 @@ class HILGUI:
         Driver function for program execution.
         """
         # Ensure that the first set of choices is always the same for every user
-        random_controllers = GUIUtils.generate_random_controllers(seed=self.seed)
+        random_controllers = GUIUtils.generate_random_controllers(seed=self.seed, heterogeneous=True)
         self.controller_history.append(random_controllers)
 
         while True:
@@ -496,7 +541,7 @@ class HILGUI:
 
             # If there is nothing in the controller history, add a list of randomly-generated controllers
             if len(self.controller_history) == 0:
-                random_controllers = GUIUtils.generate_random_controllers()
+                random_controllers = GUIUtils.generate_random_controllers(heterogeneous=True)
                 self.controller_history.append(random_controllers)
             self._one_cycle()
 
@@ -512,7 +557,7 @@ class HILGUI:
             # If the user skips, randomly generate a new controller list for the next generation
             elif self.cycle_output == "Skip":
                 self.print_archived_controllers()
-                controller_list = GUIUtils.generate_random_controllers()
+                controller_list = GUIUtils.generate_random_controllers(heterogeneous=True)
                 self.controller_history.append(controller_list)
                 self.generation += 1
             # If the user wants to go back, pop a controller list off the controller history stack
@@ -528,6 +573,7 @@ class HILGUI:
             font = pygame.font.Font(None, 25)
             self.generation_text = font.render(f"Current generation: {self.generation}", True, self.white_color)
             self.click_text = font.render(f"Number of clicks: {self.number_of_clicks}", True, self.white_color)
+            self.save_efficiency_text = font.render(f"Save efficiency: {self.get_save_efficiency()}", True, self.white_color)
             pygame.font.quit()
 
             for tile in self.tiles:
@@ -592,7 +638,9 @@ class GUITile:
         if self.archived:
             self.archived = False
             self.save_button.bg_color = (150, 150, 150)
+            self.gui.number_of_saves -= 1
         else:
+            self.gui.number_of_saves += 1
             self.archived = True
             self.save_button.bg_color = (0, 150, 0)
             self.gui.archived_controllers.append(deepcopy(self.controller))
@@ -725,8 +773,7 @@ def render_interesting_worlds():
 
 
 if __name__ == '__main__':
-    # gui = HILGUI(heterogeneous=True, save_archived_controllers=True, seed=2)
-    # gui.run()
-    update_manual_pdf()
+    gui = HILGUI(heterogeneous=True, save_archived_controllers=True, seed=2)
+    gui.run()
     # REMEMBER TO CLEAR
     # render_interesting_worlds()

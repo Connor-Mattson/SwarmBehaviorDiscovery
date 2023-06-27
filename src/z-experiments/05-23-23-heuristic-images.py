@@ -26,7 +26,7 @@ from novel_swarms.world.RectangularWorld import RectangularWorld
 from src.ui.img_process import get_image_map, generate_world_config
 
 # How many images should we collect for training
-sample_size = 10
+sample_size = 1000
 
 # Which portions of the program we should execute
 labeling = True
@@ -76,10 +76,10 @@ def _get_all_maps(control, index):
     # Save the density-map and trail-map in their appropriate locations
     trail_path = f"../../data/trail-maps/controller-{index}.jpg"
     density_path = f"../../data/density-maps/controller-{index}.jpg"
-    gif_path = f"../../data/swarm-gifs/controller-{index}.gif"
+    # gif_path = f"../../data/swarm-gifs/controller-{index}.gif"
     get_image_map(control, "trail", filepath=trail_path, world=copy.deepcopy(world))
     get_image_map(control, "density", filepath=density_path, world=copy.deepcopy(world))
-    get_image_map(control, "gif", filepath=gif_path, world=copy.deepcopy(world))
+    # get_image_map(control, "gif", filepath=gif_path, world=copy.deepcopy(world))
 
 
 def label_controller(index):
@@ -262,7 +262,6 @@ class GECCOBaselineImages:
         filtered_controllers = pd.DataFrame(np.array(valid_rows))
         filtered_controllers.to_csv(csv_filepath, index=False, header=False)
 
-
     @staticmethod
     def image_collection():
         csv_filepath = "../../data/testing_labels.csv"
@@ -326,4 +325,6 @@ class GECCOBaselineImages:
 
 
 if __name__ == '__main__':
-    GECCOBaselineImages.filter_lines()
+    # GECCOBaselineImages.filter_lines()
+    GECCOBaselineImages.image_collection()
+    GECCOBaselineImages.get_histogram()
