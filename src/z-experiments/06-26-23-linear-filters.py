@@ -72,7 +72,7 @@ def generate_gifs():
             args=(
                 unscaled_controller,
                 ["trail", "gif"],
-                [f"/home/jeremy/Desktop/unscaled_trails/unscaled-{i}-{unscaled_controller}.png",
+                [f"/home/jeremy/Desktop/unscaled_trails_1200/unscaled-{i}-{unscaled_controller}.png",
                  f"/home/jeremy/Desktop/unscaled_gifs/unscaled-{i}-{unscaled_controller}.gif"]
             )
         )
@@ -81,7 +81,7 @@ def generate_gifs():
             args=(
                 scaled_controller,
                 ["trail", "gif"],
-                [f"/home/jeremy/Desktop/scaled_trails/scaled-{i}-{unscaled_controller}.png",
+                [f"/home/jeremy/Desktop/scaled_trails_1200/scaled-{i}-{unscaled_controller}.png",
                  f"/home/jeremy/Desktop/scaled_gifs/scaled-{i}-{unscaled_controller}.gif"]
             )
         )
@@ -93,7 +93,7 @@ def generate_gifs():
 
 
 def plot_comparison():
-    directory = "/home/jeremy/Desktop/classifications/"
+    directory = "/home/jeremy/Desktop/classifications_3000/"
     behavior_names = ["aggregation", "cyclic-pursuit", "dispersal", "milling", "random", "wall-following"]
     unscaled_counts = []
     scaled_counts = []

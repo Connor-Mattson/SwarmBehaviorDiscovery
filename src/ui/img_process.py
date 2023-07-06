@@ -318,7 +318,7 @@ def get_image_map(controller, representation, filepath=None, frame_start=1200, w
         img.save(filepath)
 
 
-def get_selected_representations(controller, representations, filepaths, frame_start=3000):
+def get_selected_representations(controller, representations, filepaths, frame_start=1200):
     world = RectangularWorld(generate_world_config(controller))
     for _ in range(frame_start):
         world.step()

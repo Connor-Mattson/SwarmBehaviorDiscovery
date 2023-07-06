@@ -66,7 +66,7 @@ class GUIUtils:
         agent_config.add_sub_populuation(a2_config, p2)
         config = RectangularWorldConfig(
             size=(500, 500),
-            n_agents=30,
+            n_agents=24,
             seed=None,
             behavior=[],
             agentConfig=agent_config,
@@ -95,7 +95,7 @@ class GUIUtils:
         )
         config = RectangularWorldConfig(
             size=(500, 500),
-            n_agents=30,
+            n_agents=24,
             seed=None,
             behavior=[],
             agentConfig=agent_config,
