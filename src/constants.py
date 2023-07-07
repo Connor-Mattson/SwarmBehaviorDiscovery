@@ -144,8 +144,8 @@ def SINGLE_SENSOR_HETERO_AGENT_CONFIG(colored=False):
     agent_B = DiffDriveAgentConfig(controller=None, sensors=SINGLE_SENSOR_SET, dt=1.0,
                                    body_color=(0, 255, 0) if colored else (255, 255, 255))
     h_config = HeterogeneousSwarmConfig()
-    h_config.add_sub_populuation(agent_A, 1)  # 1 will be intentionally overwritten by controller
-    h_config.add_sub_populuation(agent_B, 1)  # 1 will be intentionally overwritten by controller
+    h_config.add_sub_populuation(agent_A, 12)  # 12 will be intentionally overwritten by controller
+    h_config.add_sub_populuation(agent_B, 12)  # 12 will be intentionally overwritten by controller
     return h_config
 
 

@@ -725,7 +725,7 @@ def render_interesting_worlds():
 
 
 if __name__ == '__main__':
-    gui = HILGUI(heterogeneous=True, save_archived_controllers=True, seed=0)
+    gui = HILGUI(heterogeneous=True, save_archived_controllers=True, seed=2)
     gui.run()
     # REMEMBER TO CLEAR
     # render_interesting_worlds()
