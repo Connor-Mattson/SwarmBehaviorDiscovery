@@ -86,7 +86,11 @@ Requires a saved PyTorch Checkpoint containing training weights (See Releases Fo
 ### Resnet18 (Type-Agnostic)
 `python evolve.py --gen 50 --pop 100 --heterogeneous --type single-sensor --strategy ResNet --species_aware --seed 0`
 
+### Swarm Chemistry
+see swarm_chemistry_evolution.py
 
+### HIL-NS 
+see HIL-NS.py
 
 
 
