@@ -10,6 +10,7 @@ import cv2
 import pygame
 from sklearn.neighbors import NearestNeighbors
 
+
 class ModifiedNoveltyArchieve(NoveltyArchive):
     def __init__(self, max_size=None, pheno_file=None, geno_file=None):
         super().__init__(max_size, pheno_file, geno_file)
@@ -44,21 +45,17 @@ class ModifiedHaltingEvolution(HaltedEvolution):
                  world: RectangularWorldConfig,
                  output_config: OutputTensorConfig,
                  evolution_config: GeneticEvolutionConfig,
-                 screen=None):
-        super().__init__(world, output_config, evolution_config, screen)
+                 screen=None,
+                 heterogeneous=False):
+        super().__init__(world, output_config, evolution_config, screen, heterogeneous=heterogeneous)
         self.archive = ModifiedNoveltyArchieve()
 
     def restart_screen(self):
         pygame.init()
         pygame.display.set_caption("Evolutionary Novelty Search")
         screen = pygame.display.set_mode((self.world.w, self.world.h))
-
-        self.output_configuration = OutputTensorConfig(
-            timeless=True,
-            total_frames=80,
-            steps_between_frames=2,
-            screen=screen
-        )
+        if self.output_configuration is not None:
+            self.output_configuration.screen = screen
 
     def next(self):
         output, behavior = self.behavior_discovery.runSinglePopulation(
@@ -66,11 +63,26 @@ class ModifiedHaltingEvolution(HaltedEvolution):
             i=self.behavior_discovery.curr_genome,
             seed=self.world.seed,
             output_config=self.output_configuration,
-            save=False
+            save=False,
+            heterogeneous=self.heterogeneous
         )
         genome = self.behavior_discovery.population[self.behavior_discovery.curr_genome]
 
         self.behavior_discovery.curr_genome += 1
+        return output, genome, behavior
+
+    def simulate_specific(self, genome):
+        output, behavior = self.behavior_discovery.runSinglePopulation(
+            screen=None,
+            i=self.behavior_discovery.curr_genome,
+            genome=genome,
+            seed=self.world.seed,
+            output_config=self.output_configuration,
+            save=False,
+            heterogeneous=self.heterogeneous
+        )
+        genome = self.behavior_discovery.population[self.behavior_discovery.curr_genome]
+        # self.behavior_discovery.curr_genome += 1
         return output, genome, behavior
 
     def miniNext(self):
@@ -93,11 +105,16 @@ class ModifiedHaltingEvolution(HaltedEvolution):
             self.behavior_discovery.archive.setRandoms(randoms)
 
     def evolve(self):
+        print(f"Calculating Scores for archive of size {len(self.behavior_discovery.archive.archive)}...")
+
         self.behavior_discovery.curr_genome = 0
         self.behavior_discovery.evaluate()
 
-        print(self.archive.__class__)
+        # print(self.archive.__class__)
+        print("=" * 30)
+        print("Novelty Scores:")
         print(self.behavior_discovery.scores)
+        print("=" * 30)
 
         self.behavior_discovery.evolve()
 

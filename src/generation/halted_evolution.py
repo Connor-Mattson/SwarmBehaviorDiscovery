@@ -20,11 +20,13 @@ class HaltedEvolution:
                  output_config: OutputTensorConfig,
                  evolution_config: GeneticEvolutionConfig,
                  screen=None,
+                 heterogeneous=False,
                  ):
         self.world = world
         self.output_configuration = output_config
         self.evolve_config = evolution_config
         self.screen = screen
+        self.heterogeneous = heterogeneous
         self.behavior_discovery = BehaviorDiscovery(
             generations=evolution_config.generations,
             population_size=evolution_config.population,
@@ -36,6 +38,7 @@ class HaltedEvolution:
             behavior_config=evolution_config.behavior_config,
             k_neighbors=evolution_config.k,
             allow_external_archive=evolution_config.use_external_archive,
+            seed=evolution_config.seed
         )
         print(self.behavior_discovery.gene_builder)
 
@@ -60,20 +63,26 @@ class HaltedEvolution:
             screen=None,
             i=self.behavior_discovery.curr_genome,
             seed=self.world.seed,
-            output_config=self.output_configuration
+            output_config=self.output_configuration,
+            heterogeneous=self.heterogeneous
         )
         behavior = self.behavior_discovery.behavior[self.behavior_discovery.curr_genome]
         genome = self.behavior_discovery.population[self.behavior_discovery.curr_genome]
         self.behavior_discovery.curr_genome += 1
         return output, behavior, genome
 
-    def simulation(self, genome):
+    def simulation(self, genome, seed=None):
+        if seed is None:
+            seed = self.world.seed
+
+        print(f"SEED: {seed}")
         output, behavior = self.behavior_discovery.runSinglePopulation(
             screen=None,
             save=False,
             genome=genome,
-            seed=self.world.seed,
-            output_config=self.output_configuration
+            seed=seed,
+            output_config=self.output_configuration,
+            heterogeneous=self.heterogeneous
         )
         return output, behavior
 
@@ -84,7 +93,7 @@ class HaltedEvolution:
         return np.array(rounded)
 
     @staticmethod
-    def defaultEvolver(steps=1200, evolve_population=100, k_samples=15, n_agents=30, gene_builder=None):
+    def defaultEvolver(steps=1200, evolve_population=100, k_samples=15, n_agents=30, gene_builder=None, heterogeneous=False):
         agent_config = ConfigurationDefaults.DIFF_DRIVE_AGENT
 
         genotype = None
@@ -136,7 +145,8 @@ class HaltedEvolution:
         halted_evolution = HaltedEvolution(
             world=world_config,
             evolution_config=novelty_config,
-            output_config=output_config
+            output_config=output_config,
+            heterogeneous=heterogeneous
         )
 
         return halted_evolution, screen

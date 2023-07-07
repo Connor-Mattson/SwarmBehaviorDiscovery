@@ -79,31 +79,20 @@ class ContinuingDataset(Dataset):
             f.write(vecToCSVLine(behavior))
 
 class SwarmDataset(Dataset):
-    def __init__(self, parent_dir, rank=0, resize=None):
+    def __init__(self, parent_dir, rank=0, resize=None, color=False):
         if not os.path.isdir(parent_dir):
             raise Exception("The provided Dataset Directory Does not exist")
         self.dir = parent_dir
         self.resize = resize
-        # self.data_folders = os.listdir(parent_dir)
-        # to_remove = []
-        # for i, obj in enumerate(self.data_folders):
-        #     subdir = os.path.join(parent_dir, obj)
-        #     if not os.path.isdir(subdir):
-        #         to_remove.append(i)
-        #     self.data_folders[i] = subdir
-
-        ####
-        # Remove to_removes eventually
-        ####
-
         self._rank = rank
+        self.color = color
 
     def __len__(self):
         return len(os.listdir(self.dir))
 
     def __getitem__(self, index):
         folder = os.path.join(self.dir, str(index))
-        image = np.array(Image.open(os.path.join(folder, "behavior.png")).convert('L'))
+        image = np.array(Image.open(os.path.join(folder, "behavior.png")).convert('L' if not self.color else "RGB"))
         context_path = os.path.join(folder, "context.txt")
         with open(context_path, "r") as f:
             genome = CSVLineToVec(f.readline())
@@ -114,7 +103,7 @@ class SwarmDataset(Dataset):
             classification = None
             if self._rank >= 1:
                 encoded = CSVLineToVec(f.readline())
-                decoded_img = np.array(Image.open(os.path.join(folder, "decoded.png")).convert('L'))
+                decoded_img = np.array(Image.open(os.path.join(folder, "decoded.png")).convert('L' if not self.color else "RGB"))
             if self._rank >= 2:
                 embedding = CSVLineToVec(f.readline())
             if self._rank >= 3:
@@ -129,7 +118,6 @@ class SwarmDataset(Dataset):
         name = f"{len(self)}"
         path = os.path.join(self.dir, name)
         os.mkdir(path)
-        print(self.resize)
         save_image = image
         if self.resize:
             frame = image.astype(np.uint8)
@@ -163,8 +151,13 @@ class SwarmDataset(Dataset):
 
 
 class DataBuilder:
-    def __init__(self, data_dir, gene_builder=None, steps=3000, agents=30, ev=None, screen=None, resize=None):
+    def __init__(self, data_dir, gene_builder=None, steps=3000, agents=30, ev=None, screen=None, resize=None, heterogeneous=False, seed=None):
+        self.DEBUG = True
         self.dataset = SwarmDataset(data_dir, resize=resize)
+
+        if seed is not None:
+            np.random.seed(seed)
+            random.seed(seed)
 
         if len(self.dataset) > 0:
             raise Exception("Requested to build a new dataset in folder that contains items")
@@ -172,24 +165,25 @@ class DataBuilder:
         if not ev and (gene_builder is None or not isinstance(gene_builder, GeneBuilder)):
             raise Exception("DataBuilder must be supplied with a GeneBuilder Configuration. See novel_swarms/novelty/GeneRule")
 
-
         if not ev:
-            self.evolution, self.screen = HaltedEvolution.defaultEvolver(steps=steps, n_agents=agents, gene_builder=gene_builder)
+            self.evolution, self.screen = HaltedEvolution.defaultEvolver(steps=steps, n_agents=agents, gene_builder=gene_builder, heterogeneous=heterogeneous)
         else:
             self.evolution, self.screen = ev, screen
         self.gene_builder = self.evolution.behavior_discovery.gene_builder
 
-    def create(self, sample_size=1000):
-        TRIALS = 1
-        pool = self.build_genome_pool(sample_size)
-        for trial in range(TRIALS):
-            for i, genome in enumerate(pool):
-                output, behavior = self.evolution.simulation(genome)
-                self.dataset.new_sample(output, genome, behavior)
-                print(f"{(i*100) / len(pool)}% Complete")
+    def create(self, sample_size=1000, custom_pool=None, custom_seeds=None):
+        if custom_pool is None:
+            pool = self.build_genome_pool(sample_size)
+        else:
+            pool = custom_pool
+
+        for i, genome in enumerate(pool):
+            output, behavior = self.evolution.simulation(genome, seed=custom_seeds[i] if custom_seeds else None)
+            self.dataset.new_sample(output, genome, behavior)
+            print(f"{(i*100) / len(pool)}% Complete")
         return self.dataset
 
-    def build_genome_pool(self, sample_size=1000):
+    def build_genome_pool(self, sample_size=1000, seed=None):
         gene_pool = []
         for sample in range(sample_size):
             gene_pool.append(self.gene_builder.fetch_random_genome())

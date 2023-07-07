@@ -14,8 +14,7 @@ from novel_swarms.sensors.SensorSet import SensorSet
 from novel_swarms.config.AgentConfig import DiffDriveAgentConfig
 from novel_swarms.config.WorldConfig import RectangularWorldConfig
 
-if __name__ == "__main__":
-
+def demo_cyclic():
     CYCLIC_PURSUIT_CONTROLLER = [-0.7, 0.3, 1.0, 1.0]
     SEED = 1
 
@@ -47,3 +46,17 @@ if __name__ == "__main__":
     )
 
     simulate(world_config=world_config)
+
+if __name__ == "__main__":
+    # demo_cyclic()
+    import torch
+    import math
+    a = torch.linspace(0., 2. * math.pi, steps=25, requires_grad=True)
+    b = torch.sin(a)
+    c = 2 * b
+    d = c + 1
+    out = d.sum()
+
+    out.backward()
+
+    print(d)

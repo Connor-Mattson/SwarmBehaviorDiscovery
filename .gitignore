@@ -3,6 +3,9 @@ data/
 old-experiments
 checkpoints
 NovelSwarmBehavior
+evolution
+Mattson-*
+Brown-*
 
 .coverage
 coverage.xml
