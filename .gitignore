@@ -7,6 +7,9 @@ evolution
 Mattson-*
 Brown-*
 
+src/z-experiments/Sum24-notebooks/checkpoints
+src/z-experiments/Sum24-notebooks/data
+
 .coverage
 coverage.xml
 .dmypy.json
