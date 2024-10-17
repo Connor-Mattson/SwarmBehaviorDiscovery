@@ -1,4 +1,4 @@
-from torch.optim.optimizer import Optimizer, required
+from torch.optim.optimizer import Optimizer
 import torch
 
 # almost copy paste from https://github.com/noahgolmant/pytorch-lars/blob/master/lars.py
@@ -21,9 +21,9 @@ class LARS(Optimizer):
         >>> optimizer.step()
     """
 
-    def __init__(self, params, lr=required, momentum=0, eta=1e-3, dampening=0,
+    def __init__(self, params, lr=1e-3, momentum=0, eta=1e-3, dampening=0,
                  weight_decay=0, nesterov=False, epsilon=0):
-        if lr is not required and lr < 0.0:
+        if lr is not None and lr < 0.0:
             raise ValueError("Invalid learning rate: {}".format(lr))
         if momentum < 0.0:
             raise ValueError("Invalid momentum value: {}".format(momentum))

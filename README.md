@@ -1,9 +1,5 @@
-# Exploring Behavior Discovery Methods for Heterogeneous Swarms of Limited-Capability Robots
-Contributors: Connor Mattson, Jeremy C. Clark, Daniel S. Brown
-
-[//]: # (# Leveraging Human Feedback to Evolve and Discover Novel Emergent Behaviors in Robot Swarms)
-
-[//]: # (Contributors: Connor Mattson, Daniel S. Brown)
+# Discovery and Deployment of Emergent Robot Swarm Behaviors via Representation Learning and Real2Sim2Real Transfer
+Contributors: Anonymous
 
 ## Required Software
 - Python & Pip
@@ -13,106 +9,21 @@ Contributors: Connor Mattson, Jeremy C. Clark, Daniel S. Brown
 Install Python Packages
     
     pip install -r requirements.txt
+    pip install -i https://test.pypi.org/simple/ novel-swarms --upgrade
 
-[//]: # (# Robot Swarm Simulation)
+## Train Self-Supervised Repr. Learning
+1. open "simclr.py", modify PARAMS with path to training data
+2. run `python simclr.py`.
 
-[//]: # ()
-[//]: # (We use a custom swarm simulator to parameterize agents and environments. See this repository for details on how to create your own agent types and simulate swarm behaviors: https://github.com/Connor-Mattson/RobotSwarmSimulator)
+## Real2Sim2Real Novelty Search with SSL (RSRS)
+1. open "SimCLR-NS.py", modify "SIMCLR_CHECKPOINT" to point to the saved model from the previous step
+2. ensure that "WITH_RSRS" is set to True.
+3. run `python SimCLR-NS.py`
 
-[//]: # ()
-[//]: # (## Test Simulation)
+## Novelty Search (No RSRS enhancement)
+1. open "SimCLR-NS.py", modify "SIMCLR_CHECKPOINT" to point to the saved model from the previous step
+2. ensure that "WITH_RSRS" is set to True.
+3. run `python SimCLR-NS.py`
 
-[//]: # ()
-[//]: # (To test the simulation package, 'novel_swarms', run the following command where agents perform a cyclic pursuit collective behavior)
-
-[//]: # (`python demo.py`)
-
-[//]: # ()
-[//]: # (# Novel Behavior Discovery)
-
-[//]: # (## Generate Dataset)
-
-[//]: # (Requires directory 'data' at project root.)
-
-[//]: # ()
-[//]: # (`python generate_dataset.py --help`)
-
-[//]: # ()
-[//]: # (OR see [latest releases]&#40;https://github.com/Connor-Mattson/SwarmBehaviorDiscovery/releases/tag/v0.1.0-alpha&#41; for an example dataset to examine: "gecco-filtered-two-sensor.zip", this file should be unzipped in the top-level "data" folder.)
-
-[//]: # ()
-[//]: # (## Self-Supervised Learning &#40;Contrastive Learning&#41;)
-
-[//]: # (Requires a Contrastive Learning Dataset, generated from the previous file)
-
-[//]: # ()
-[//]: # (`python self_supervised_training.py --help`)
-
-[//]: # ()
-[//]: # (OR see [latest releases]&#40;https://github.com/Connor-Mattson/SwarmBehaviorDiscovery/releases/tag/v0.1.0-alpha&#41; for model parameters of self-supervised training alone: "Two-Sensor-Self-Supervised-Models.zip")
-
-[//]: # ()
-[//]: # (## Human-in-the-loop &#40;HIL&#41; Learning)
-
-[//]: # (Should be performed after pretraining and requires a set of human labeled behaviors)
-
-[//]: # ()
-[//]: # (`python human_query_training.py --help`)
-
-[//]: # ()
-[//]: # (OR see [latest releases]&#40;https://github.com/Connor-Mattson/SwarmBehaviorDiscovery/releases/tag/v0.1.0-alpha&#41; for model parameters of HIL training on top of self-supervised learning: "Two-Sensor-HIL-Models.zip")
-
-## Novelty Search and Evolution
-Requires a saved PyTorch Checkpoint containing training weights (See Releases Folder)
-
-`python evolve.py --help`
-
-
-### Hand-Crafted Metrics (Type-Agnostic)
-`python evolve.py --gen 50 --pop 100 --heterogeneous --type single-sensor --strategy Brown_et_al --seed 0`
-
-### Hand-Crafted Metrics (Type-Aware)
-`python evolve.py --gen 50 --pop 100 --heterogeneous --type single-sensor --strategy Brown_et_al --species_aware --seed 0`
-
-### Latent Learning (Type-Agnostic)
-`python evolve.py --gen 50 --pop 100 --heterogeneous --type single-sensor --strategy Mattson_and_Brown --checkpoint [MODEL_CHECKPOINT_HERE] --seed 0`
-
-### Latent Learning (Type-Aware)
-`python evolve.py --gen 50 --pop 100 --heterogeneous --type single-sensor --strategy Mattson_and_Brown  --checkpoint [MODEL_CHECKPOINT_HERE] --species_aware --seed 0`
-
-### Resnet18 (Type-Aware)
-`python evolve.py --gen 50 --pop 100 --heterogeneous --type single-sensor --strategy ResNet --seed 0`
-
-### Resnet18 (Type-Agnostic)
-`python evolve.py --gen 50 --pop 100 --heterogeneous --type single-sensor --strategy ResNet --species_aware --seed 0`
-
-### Swarm Chemistry
-see swarm_chemistry_evolution.py
-
-### HIL-NS 
-see HIL-NS.py
-
-
-
-[//]: # (## Visualize Embedding Spaces)
-
-[//]: # (Requires a saved PyTorch Checkpoint containing training weights)
-
-[//]: # (see `visualize-embeddings.ipynb`)
-
-[//]: # ()
-[//]: # (## Obtain L2 Accuracy)
-
-[//]: # (Requires a saved PyTorch Checkpoint containing training weights)
-
-[//]: # (see `accuracy-results.ipynb`)
-
-
-[//]: # (## Augmentation)
-
-[//]: # (We have explored the idea of augmenting this framework further to allow more complex world, sensor, controller, and actuator spaces. )
-
-[//]: # (Much of the backbone to support these augmentations is present in this codebase, but lacks testing and robustness.)
-
-[//]: # ()
-[//]: # (We invite you to augment cautiously and carefully test output validity.)
+## Results Plots and Analysis
+see ipython notebooks "compute_class_confusion.ipynb" and "results_plots.py"

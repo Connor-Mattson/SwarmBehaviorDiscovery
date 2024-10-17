@@ -10,6 +10,37 @@ class NoveltyEmbedding(torch.nn.Module):
         super().__init__()
         if new_model:
             self.s1 = torch.nn.Sequential(
+                torch.nn.Conv2d(1, 32, 3, stride=1, padding=0),
+                torch.nn.MaxPool2d(3, stride=3),
+                torch.nn.Conv2d(32, 64, 3, stride=1, padding=0),
+                torch.nn.MaxPool2d(2, stride=2),
+                # torch.nn.Conv2d(20, 50, 3, stride=1, padding=0),
+                # torch.nn.LeakyReLU(),
+                torch.nn.Flatten(),
+                torch.nn.Linear(3136, 512),
+                torch.nn.ReLU(),
+                torch.nn.Linear(512, 64),
+                torch.nn.ReLU(),
+                torch.nn.Linear(64, out_size),
+            )
+        else:
+            # self.s1 = torch.nn.Sequential(
+            #     torch.nn.Conv2d(1, 1, 5, stride=2, padding=2),
+            #     torch.nn.LeakyReLU(),
+            #     torch.nn.Conv2d(1, 1, 3, stride=2, padding=1),
+            #     torch.nn.LeakyReLU(),
+            #     torch.nn.Conv2d(1, 1, 3, stride=2, padding=1),
+            #     torch.nn.LeakyReLU(),
+            #     torch.nn.Flatten(),
+            #     torch.nn.Linear(3969, 1024),
+            #     torch.nn.ReLU(),
+            #     torch.nn.Linear(1024, 256),
+            #     torch.nn.ReLU(),
+            #     torch.nn.Linear(256, 100),
+            #     torch.nn.ReLU(),
+            #     torch.nn.Linear(100, out_size),
+            # )
+            self.s1 = torch.nn.Sequential(
                 torch.nn.Conv2d(1, 1, 3, stride=1, padding=0),
                 torch.nn.LeakyReLU(),
                 torch.nn.Conv2d(1, 1, 3, stride=1, padding=0),
@@ -23,23 +54,7 @@ class NoveltyEmbedding(torch.nn.Module):
                 torch.nn.ReLU(),
                 torch.nn.Linear(64, out_size),
             )
-        else:
-            self.s1 = torch.nn.Sequential(
-                torch.nn.Conv2d(1, 1, 5, stride=2, padding=2),
-                torch.nn.LeakyReLU(),
-                torch.nn.Conv2d(1, 1, 3, stride=2, padding=1),
-                torch.nn.LeakyReLU(),
-                torch.nn.Conv2d(1, 1, 3, stride=2, padding=1),
-                torch.nn.LeakyReLU(),
-                torch.nn.Flatten(),
-                torch.nn.Linear(3969, 1024),
-                torch.nn.ReLU(),
-                torch.nn.Linear(1024, 256),
-                torch.nn.ReLU(),
-                torch.nn.Linear(256, 100),
-                torch.nn.ReLU(),
-                torch.nn.Linear(100, out_size),
-            )
+        print("Initialized Network with ", sum(p.numel() for p in self.parameters() if p.requires_grad), "parameters")
 
     def forward(self, x):
         x = self.s1(x)

@@ -79,20 +79,33 @@ class ContinuingDataset(Dataset):
             f.write(vecToCSVLine(behavior))
 
 class SwarmDataset(Dataset):
-    def __init__(self, parent_dir, rank=0, resize=None, color=False):
+    def __init__(self, parent_dir, rank=0, resize=None, video=False, color=False):
         if not os.path.isdir(parent_dir):
             raise Exception("The provided Dataset Directory Does not exist")
         self.dir = parent_dir
         self.resize = resize
         self._rank = rank
         self.color = color
+        self.video = video
+        self.shuff_indices = list(range(len(self)))
 
     def __len__(self):
         return len(os.listdir(self.dir))
 
     def __getitem__(self, index):
         folder = os.path.join(self.dir, str(index))
-        image = np.array(Image.open(os.path.join(folder, "behavior.png")).convert('L' if not self.color else "RGB"))
+        if self.video:
+            i = 1
+            image_or_video = []
+            frame_path = os.path.join(folder, f"behavior{i}.png")
+            while os.path.exists(frame_path):
+                img = np.array(Image.open(frame_path).convert('L' if not self.color else "RGB"))
+                image_or_video.append(img)
+                i += 1
+                frame_path = os.path.join(folder, f"behavior{i}.png")
+            image_or_video = np.array(image_or_video)
+        else:
+            image_or_video = np.array(Image.open(os.path.join(folder, "behavior.png")).convert('L' if not self.color else "RGB"))
         context_path = os.path.join(folder, "context.txt")
         with open(context_path, "r") as f:
             genome = CSVLineToVec(f.readline())
@@ -109,20 +122,41 @@ class SwarmDataset(Dataset):
             if self._rank >= 3:
                 classification = int(f.readline())
 
-        return image, genome, behavior, encoded, decoded_img, embedding, classification
+        return image_or_video, genome, behavior, encoded, decoded_img, embedding, classification
+
+    def shuffle(self):
+        random.shuffle(self.shuff_indices)
+
+    def shuff_sample(self, i):
+        return self[self.shuff_indices[i]]
 
     def set_rank(self, rank):
         self._rank = rank
 
-    def new_sample(self, image, genome, behavior=None):
+    def new_sample(self, image_or_video, genome, behavior=None):
         name = f"{len(self)}"
         path = os.path.join(self.dir, name)
         os.mkdir(path)
-        save_image = image
-        if self.resize:
-            frame = image.astype(np.uint8)
-            save_image = cv2.resize(frame, dsize=self.resize, interpolation=cv2.INTER_AREA)
-        matplotlib.image.imsave(f'{path}/behavior.png', save_image, cmap='gray')
+        if self.video:
+            save_video = image_or_video
+            frame_list = []
+            for i in range(1, image_or_video.shape[0]):
+                frame = save_video[i]
+                if self.resize:
+                    frame = frame.astype(np.uint8)
+                    frame = cv2.resize(frame, dsize=self.resize, interpolation=cv2.INTER_AREA)
+                matplotlib.image.imsave(f'{path}/behavior{i}.png', frame, cmap='gray')
+                frame_list.append(Image.fromarray(frame))
+            # Save GIF for human visualization
+            frame_list[0].save(os.path.join(f'{path}/rollout.gif'), save_all=True, append_images=frame_list[1:], duration=1, loop=1)
+        else:
+            save_image = image_or_video
+            if self.resize:
+                frame = save_image.astype(np.uint8)
+                save_image = cv2.resize(frame, dsize=self.resize, interpolation=cv2.INTER_AREA)
+            matplotlib.image.imsave(f'{path}/behavior.png', save_image, cmap='gray')
+
+        # Save the context, i.e. the genome and behavior vector
         with open(os.path.join(path, "context.txt"), "x") as f:
             f.write(vecToCSVLine(genome))
             if behavior is not None:
@@ -148,12 +182,21 @@ class SwarmDataset(Dataset):
         else:
             raise Exception("You cannot call add image when a decoded image has already been called!")
 
+    def copy_genome_pool(self):
+        """
+        Copies the genome pool for this dataset to be used in the creation of a duplicate dataset
+        Returns: A python list of genomes for the dataset
+        """
+        gene_pool = []
+        for i in range(len(self)):
+            gene_pool.append(self[i][1])  # 1 is the index for the gene
+        return gene_pool
 
 
 class DataBuilder:
-    def __init__(self, data_dir, gene_builder=None, steps=3000, agents=30, ev=None, screen=None, resize=None, heterogeneous=False, seed=None):
+    def __init__(self, data_dir, gene_builder=None, steps=3000, agents=30, ev=None, screen=None, resize=None, heterogeneous=False, seed=None, video=False):
         self.DEBUG = True
-        self.dataset = SwarmDataset(data_dir, resize=resize)
+        self.dataset = SwarmDataset(data_dir, resize=resize, video=video)
 
         if seed is not None:
             np.random.seed(seed)
@@ -188,3 +231,4 @@ class DataBuilder:
         for sample in range(sample_size):
             gene_pool.append(self.gene_builder.fetch_random_genome())
         return gene_pool
+

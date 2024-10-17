@@ -6,8 +6,6 @@ Human picks 1-2 out of 8 behaviors shown on a GUI.
 Behaviors are subsequently mutated and combined, or just mutated if only one is selected.
 In this case, the human acts as the fitness function, searching for novel/interesting behaviors.
 For instructions on how to operate this GUI, view `HIL-GUI-manual.pdf`
-
-Author: Jeremy Clark
 """
 
 import math

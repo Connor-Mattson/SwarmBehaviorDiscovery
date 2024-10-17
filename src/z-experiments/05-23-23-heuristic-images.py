@@ -4,8 +4,6 @@ and entropic behaviors using image data. This could act as another heuristic fil
 to the hand-crafted filters outlined in the GECCO paper.
 First, we'll try analyzing the images using statistics to see if we can pick out a pattern.
 If that doesn't work, we'll try training a CNN model instead.
-
-Author: Jeremy Clark
 """
 import copy
 import os.path

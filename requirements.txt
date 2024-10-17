@@ -54,10 +54,6 @@ nest-asyncio==1.5.5
 notebook==6.4.12
 novel-swarms==0.1.9a0
 numpy==1.23.1
-nvidia-cublas-cu11==11.10.3.66
-nvidia-cuda-nvrtc-cu11==11.7.99
-nvidia-cuda-runtime-cu11==11.7.99
-nvidia-cudnn-cu11==8.5.0.96
 oauthlib==3.2.1
 opencv-python==4.6.0.66
 packaging==21.3
@@ -116,8 +112,7 @@ threadpoolctl==3.1.0
 tinycss2==1.1.1
 tomli==2.0.1
 torch==1.13.1
-torchaudio==0.12.1+cu116
-torchlars==0.1.2
+torchaudio
 torchvision==0.14.1
 tornado==6.2
 traitlets==5.4.0

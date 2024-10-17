@@ -5,7 +5,8 @@ import os
 import numpy as np
 from src.networks.embedding import NoveltyEmbedding
 from scipy import ndimage
-from src.networks.lars import LARS
+from src.networks.custom_loss import CustomTripletMarginLoss
+
 
 
 def init_weights_randomly(m):
@@ -41,7 +42,7 @@ class Ensemble:
             self.lr = lr
 
         self.optimizers = [
-            torch.optim.Adam(self.ensemble[i].parameters(), lr=self.lr[i], eps=1e-6) for i in range(len(self.ensemble))
+            torch.optim.Adam(self.ensemble[i].parameters(), lr=self.lr[i], eps=1e-8) for i in range(len(self.ensemble))
             # LARS(self.ensemble[i].parameters(), lr, momentum=0.9, weight_decay=5e-4, eta=0.001, epsilon=1e-3, nesterov=True) for i in range(size)
             # torch.optim.SGD(self.ensemble[i].parameters(), lr=lr, momentum=0.9, weight_decay=weight_decay) for i in range(size)
         ]
@@ -76,23 +77,27 @@ class Ensemble:
 
     def train_batch(self, anchor, positive, negative):
         self.training_mode()
-        loss_fn = torch.nn.TripletMarginLoss(margin=self.margin)
+
+        # loss_fn = torch.nn.TripletMarginLoss(margin=self.margin)
+        loss_fn = CustomTripletMarginLoss(margin=self.margin)
+
         losses = []
         for i, network in enumerate(self.ensemble):
             self.optimizers[i].zero_grad()
             anchor_out, pos_out, neg_out = network.batch_network_from_numpy(anchor, positive, negative)
             loss = loss_fn(anchor_out, pos_out, neg_out)
-            if loss.item() > 0:
-                loss.backward()
-                if self.dynamic_lr:
-                    self.optimizers[i].step()
-                else:
-                    self.optimizers[i].step()
+            loss.backward()
+            if self.dynamic_lr:
+                self.optimizers[i].step()
+            else:
+                self.optimizers[i].step()
             losses.append(loss.item())
         return losses
 
     def eval_batch(self, anchor, positive, negative):
-        loss_fn = torch.nn.TripletMarginLoss(margin=self.margin)
+        # loss_fn = torch.nn.TripletMarginLoss(margin=self.margin)
+
+        loss_fn = CustomTripletMarginLoss(margin=self.margin)
         losses = []
         for i, network in enumerate(self.ensemble):
             anchor_out, pos_out, neg_out = network.batch_network_from_numpy(anchor, positive, negative)

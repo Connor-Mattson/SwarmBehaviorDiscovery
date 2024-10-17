@@ -3,7 +3,6 @@ Image processing package for swarm behavior.
 This package contains two functions, `get-trail-map` and `get-density-map`,
 which generate and save image representations of a given controller.
 
-Author: Jeremy Clark
 """
 import math
 import numpy as np
@@ -290,7 +289,7 @@ if __name__ == '__main__':
         [-0.7, -0.5, 0.8, 0.5, 0.6, 0.7, -0.4, -0.5, 0.125],
     ]
     cluster_algo = "dbscan"
-    gif_dir = f"/home/jeremy/Desktop/clusters/{cluster_algo}/"
+    gif_dir = f"~/Desktop/clusters/{cluster_algo}/"
     for i, genome in enumerate(genomes):
         print(f"Saving image #{i+1}")
         filepath = os.path.join(gif_dir, f"cluster-{i}.gif")

@@ -13,15 +13,14 @@ This file runs evolution but halts and waits until hearing back from the end of 
 regarding the quality of the genome that was outputted by this code
 """
 
-
 class HaltedEvolution:
     def __init__(self,
-                 world: RectangularWorldConfig,
-                 output_config: OutputTensorConfig,
-                 evolution_config: GeneticEvolutionConfig,
-                 screen=None,
-                 heterogeneous=False,
-                 ):
+             world: RectangularWorldConfig,
+             output_config: OutputTensorConfig,
+             evolution_config: GeneticEvolutionConfig,
+             screen=None,
+             heterogeneous=False,
+         ):
         self.world = world
         self.output_configuration = output_config
         self.evolve_config = evolution_config
